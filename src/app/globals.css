@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  --cream: #f4ead8;
+  --paper: #fbf6ec;
+  --sand: #e7d7b8;
+  --ink: #1c1610;
+  --ink-soft: #4a4036;
+  --muted: #6f6356;
+  --leaf: #2c4a32;
+  --leaf-deep: #173022;
+  --leaf-bright: #3f6b45;
+  --clay: #c45c32;
+  --clay-deep: #9a3f1e;
+  --sun: #d9a441;
+  --soil: #3b2418;
+  --line: rgba(28, 22, 16, 0.12);
+  --shadow: 0 18px 50px rgba(28, 22, 16, 0.08);
+}
+
+@theme inline {
+  --color-cream: var(--cream);
+  --color-paper: var(--paper);
+  --color-sand: var(--sand);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-leaf: var(--leaf);
+  --color-leaf-deep: var(--leaf-deep);
+  --color-leaf-bright: var(--leaf-bright);
+  --color-clay: var(--clay);
+  --color-clay-deep: var(--clay-deep);
+  --color-sun: var(--sun);
+  --color-soil: var(--soil);
+  --color-line: var(--line);
+  --font-display: var(--font-fraunces);
+  --font-body: var(--font-figtree);
+  --font-tamil: var(--font-noto-tamil);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--sun);
+  color: var(--soil);
+}
+
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+}
+
+.font-tamil {
+  font-family: var(--font-tamil), var(--font-body), sans-serif;
+}
+
+.texture {
+  background-image:
+    radial-gradient(1200px 500px at 10% -10%, rgba(217, 164, 65, 0.16), transparent 55%),
+    radial-gradient(900px 420px at 100% 0%, rgba(44, 74, 50, 0.12), transparent 50%);
+}
+
+.grain {
+  position: relative;
+}
+
+.grain::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+}
+
+.rule {
+  height: 1px;
+  background: var(--line);
+}
+
+.underline-draw {
+  background-image: linear-gradient(var(--clay), var(--clay));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 2px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: rise 0.8s ease both;
+}
+
+.rise-delay {
+  animation: rise 0.9s ease 0.12s both;
+}
