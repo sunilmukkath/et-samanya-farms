@@ -1,4 +1,5 @@
-import { index, integer, jsonb, pgTable, real, text, timestamp } from "drizzle-orm/pg-core";
+import type { DeviceKind, DeviceMetrics, DeviceStatus } from "@/lib/equipment";
+import { index, integer, jsonb, pgTable, real, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const observationDomains = [
   "trees",
@@ -124,7 +125,51 @@ export const observations = pgTable(
   (t) => [index("observations_domain_occurred_idx").on(t.domain, t.occurredAt)],
 );
 
+export const farmDevices = pgTable(
+  "farm_devices",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").$type<DeviceKind>().notNull(),
+    name: text("name").notNull(),
+    zone: text("zone"),
+    vendor: text("vendor"),
+    model: text("model"),
+    token: text("token").notNull(),
+    status: text("status").$type<DeviceStatus>().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }),
+    lastMetrics: jsonb("last_metrics").$type<DeviceMetrics | null>(),
+    desiredState: text("desired_state"),
+    reportedState: text("reported_state"),
+    streamUrl: text("stream_url"),
+    snapshotUrl: text("snapshot_url"),
+    note: text("note"),
+    lat: real("lat"),
+    lng: real("lng"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [index("farm_devices_kind_idx").on(t.kind), uniqueIndex("farm_devices_token_idx").on(t.token)],
+);
+
+export const deviceReadings = pgTable(
+  "device_readings",
+  {
+    id: text("id").primaryKey(),
+    deviceId: text("device_id").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" }).notNull(),
+    metrics: jsonb("metrics").$type<DeviceMetrics>(),
+    photoUrl: text("photo_url"),
+    note: text("note"),
+    lat: real("lat"),
+    lng: real("lng"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [index("device_readings_device_occurred_idx").on(t.deviceId, t.occurredAt)],
+);
+
 export type SpeciesRow = typeof speciesCatalog.$inferSelect;
 export type ZoneRow = typeof farmZones.$inferSelect;
 export type TreeRow = typeof trees.$inferSelect;
 export type ObservationRow = typeof observations.$inferSelect;
+export type DeviceRow = typeof farmDevices.$inferSelect;
+export type ReadingRow = typeof deviceReadings.$inferSelect;
