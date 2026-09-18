@@ -1,4 +1,4 @@
-import { isAdminEmail } from "@/lib/admins";
+import { isFarmEmail } from "@/lib/admins";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -29,7 +29,7 @@ providers.push(
       const password = String(credentials?.password ?? "");
       const expected = process.env.AUTH_DEV_PASSWORD;
       if (!expected || !email || !password) return null;
-      if (!isAdminEmail(email) || password !== expected) return null;
+      if (!isFarmEmail(email) || password !== expected) return null;
       return { id: "admin", email, name: "Farm admin" };
     },
   }),
@@ -44,7 +44,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (!isAdminEmail(user.email)) return false;
+      if (!isFarmEmail(user.email)) return false;
       if (account?.provider === "google") {
         const googleProfile = profile as { email_verified?: boolean } | undefined;
         if (googleProfile?.email_verified === false) return false;

@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { seedSpecies, zoneLabels } from "@/lib/farm";
+import { seedPlots, seedSpecies, zoneLabels } from "@/lib/farm";
 import * as schema from "@/db/schema";
 
 type Database = ReturnType<typeof drizzle<typeof schema>>;
@@ -60,6 +60,28 @@ export async function ensureSchema() {
     created_at timestamptz NOT NULL DEFAULT now()
   )`;
 
+  await sql`CREATE TABLE IF NOT EXISTS plots (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    kind text NOT NULL,
+    polygon jsonb,
+    note text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS animals (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    species text NOT NULL,
+    sex text,
+    tag text,
+    born_on date,
+    status text NOT NULL DEFAULT 'active',
+    note text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
   await sql`CREATE TABLE IF NOT EXISTS trees (
     id text PRIMARY KEY,
     lat double precision NOT NULL,
@@ -93,10 +115,55 @@ export async function ensureSchema() {
     weather jsonb,
     details jsonb,
     tree_id text,
+    plot_id text,
+    animal_id text,
+    source text,
+    created_by text,
     created_at timestamptz NOT NULL DEFAULT now()
   )`;
 
+  await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS plot_id text`;
+  await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS animal_id text`;
+  await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS source text`;
+  await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS created_by text`;
+
   await sql`CREATE INDEX IF NOT EXISTS observations_domain_occurred_idx ON observations (domain, occurred_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS observations_plot_idx ON observations (plot_id)`;
+
+  await sql`CREATE TABLE IF NOT EXISTS tasks (
+    id text PRIMARY KEY,
+    title text NOT NULL,
+    due_at timestamptz,
+    source text NOT NULL,
+    domain text,
+    tree_id text,
+    plot_id text,
+    animal_id text,
+    completed_at timestamptz,
+    completed_observation_id text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS briefs (
+    id text PRIMARY KEY,
+    kind text NOT NULL,
+    period_start timestamptz NOT NULL,
+    period_end timestamptz NOT NULL,
+    markdown text NOT NULL,
+    stats jsonb,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS ledger (
+    id text PRIMARY KEY,
+    occurred_at timestamptz NOT NULL DEFAULT now(),
+    kind text NOT NULL,
+    category text NOT NULL,
+    amount double precision NOT NULL,
+    note text,
+    observation_id text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
 
   const existingSpecies = await sql`SELECT count(*)::int AS count FROM species_catalog`;
   if (!existingSpecies[0]?.count) {
@@ -115,6 +182,14 @@ export async function ensureSchema() {
     }
     await sql`INSERT INTO farm_zones (id, name, polygon, created_at)
       VALUES (${crypto.randomUUID()}, ${"Farm boundary"}, NULL, now())`;
+  }
+
+  const existingPlots = await sql`SELECT count(*)::int AS count FROM plots`;
+  if (!existingPlots[0]?.count) {
+    for (const plot of seedPlots) {
+      await sql`INSERT INTO plots (id, name, kind, polygon, note, created_at)
+        VALUES (${crypto.randomUUID()}, ${plot.name}, ${plot.kind}, NULL, NULL, now())`;
+    }
   }
 
   globalForDb.farmDbReady = true;

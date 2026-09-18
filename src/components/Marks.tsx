@@ -8,22 +8,17 @@ export function BrandLockup({
   className?: string;
 }) {
   const src = variant === "white" ? "/brand/lockup-white.png" : "/brand/lockup-ink.png";
-  const label = variant === "white" ? "text-sand" : "text-muted";
+  const size = variant === "white" ? { width: 498, height: 111 } : { width: 507, height: 117 };
 
   return (
-    <span className={`inline-flex items-center gap-3 ${className}`}>
-      <Image
-        src={src}
-        alt="Sāmānya"
-        width={378}
-        height={137}
-        className="h-9 w-auto sm:h-10"
-        priority
-      />
-      <span className={`text-[10px] font-semibold uppercase tracking-[0.22em] ${label}`}>
-        Farms
-      </span>
-    </span>
+    <Image
+      src={src}
+      alt="Sāmānya Farms"
+      width={size.width}
+      height={size.height}
+      className={`block w-auto ${className || "h-12 sm:h-14"}`}
+      priority
+    />
   );
 }
 

@@ -51,7 +51,7 @@ export async function SiteFooter() {
           <p>© {new Date().getFullYear()} {site.legalName}</p>
           <div className="flex items-center gap-4">
             {session ? (
-              <Link href="/admin" className="underline decoration-sun underline-offset-4 hover:text-sun">
+              <Link href="/admin" className="font-semibold text-cream underline decoration-sun underline-offset-4 hover:text-sun">
                 Farm log
               </Link>
             ) : null}

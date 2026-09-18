@@ -3,33 +3,51 @@
 import { revalidatePath } from "next/cache";
 import {
   canPersistFarmData,
+  completeTask,
   getTree,
+  insertAnimal,
+  insertLedger,
   insertObservation,
+  insertPlot,
   insertTree,
   listObservations,
   nearbyTrees,
   saveFarmBoundary,
+  updatePlot,
   updateTree,
   upsertSpecies,
 } from "@/db/queries";
 import type {
   AiSuggestion,
   GeoPolygon,
+  LedgerKind,
   ObservationDetails,
   ObservationDomain,
+  ObservationSource,
+  PlotKind,
   TreeHabit,
   TreeHealth,
 } from "@/db/schema";
-import { requireAdmin } from "@/lib/admin";
-import { isObservationDomain } from "@/lib/farm";
+import { farmRole, requireAdmin, requireOperator } from "@/lib/admin";
+import { generateFarmBrief } from "@/lib/brief";
+import { isObservationDomain, plotKindOptions } from "@/lib/farm";
 import { uploadPhoto } from "@/lib/photos";
-import { suggestFromImage } from "@/lib/vision";
+import { deriveFarmTasks } from "@/lib/tasks";
+import { suggestFromImage, visionPackForDomain, type VisionPack } from "@/lib/vision";
 import { getFarmWeather, weatherSnapshot } from "@/lib/weather";
 
 function revalidateAdmin() {
   revalidatePath("/admin");
   revalidatePath("/admin/map");
   revalidatePath("/admin/log");
+  revalidatePath("/admin/brief");
+  revalidatePath("/admin/tasks");
+  revalidatePath("/admin/search");
+  revalidatePath("/admin/season");
+  revalidatePath("/admin/ledger");
+  revalidatePath("/admin/plots");
+  revalidatePath("/admin/animals");
+  revalidatePath("/harvest");
 }
 
 function str(form: FormData, key: string) {
@@ -60,6 +78,12 @@ function habitValue(value: string): TreeHabit | null {
   return null;
 }
 
+function sourceValue(value: string, role: "operator" | "staff" | null): ObservationSource {
+  if (value === "sensor" || value === "drone" || value === "voice") return value;
+  if (role === "staff") return "staff";
+  return "operator";
+}
+
 function detailsFromForm(domain: ObservationDomain, form: FormData): ObservationDetails {
   const details: ObservationDetails = {};
   if (domain === "harvest" || domain === "plants" || domain === "plant_health") {
@@ -71,12 +95,23 @@ function detailsFromForm(domain: ObservationDomain, form: FormData): Observation
     if (quantity != null) details.quantity = quantity;
     const unit = str(form, "unit");
     if (unit) details.unit = unit;
+    const destination = str(form, "destination");
+    if (destination) details.destination = destination;
   }
   if (domain === "rain") {
     const rainMm = num(form, "rainMm");
     if (rainMm != null) details.rainMm = rainMm;
     const pondLevel = str(form, "pondLevel");
     if (pondLevel) details.pondLevel = pondLevel;
+    const irrigationMinutes = num(form, "irrigationMinutes");
+    if (irrigationMinutes != null) details.irrigationMinutes = irrigationMinutes;
+    const pump = str(form, "pumpOn");
+    if (pump === "On") details.pumpOn = true;
+    if (pump === "Off") details.pumpOn = false;
+    const canalNote = str(form, "canalNote");
+    if (canalNote) details.canalNote = canalNote;
+    const tankLevel = str(form, "tankLevel");
+    if (tankLevel) details.tankLevel = tankLevel;
   }
   if (domain === "soil") {
     const moisture = str(form, "moisture");
@@ -95,6 +130,8 @@ function detailsFromForm(domain: ObservationDomain, form: FormData): Observation
     if (animalCount != null) details.animalCount = animalCount;
     const animalCondition = str(form, "animalCondition");
     if (animalCondition) details.animalCondition = animalCondition;
+    const feedKg = num(form, "feedKg");
+    if (feedKg != null) details.feedKg = feedKg;
   }
   if (domain === "plant_health") {
     const severity = str(form, "severity");
@@ -113,6 +150,10 @@ function detailsFromForm(domain: ObservationDomain, form: FormData): Observation
     if (activityType) details.activityType = activityType;
     const attendees = num(form, "attendees");
     if (attendees != null) details.attendees = attendees;
+    const hours = num(form, "hours");
+    if (hours != null) details.hours = hours;
+    const who = str(form, "who");
+    if (who) details.who = who;
   }
   if (domain === "trees") {
     const action = str(form, "action");
@@ -120,13 +161,35 @@ function detailsFromForm(domain: ObservationDomain, form: FormData): Observation
     const crop = str(form, "species");
     if (crop) details.crop = crop;
   }
+  if (domain === "kit") {
+    const kitItem = str(form, "kitItem");
+    if (kitItem) details.kitItem = kitItem;
+    const kitStatus = str(form, "kitStatus");
+    if (kitStatus) details.kitStatus = kitStatus;
+    const hours = num(form, "hours");
+    if (hours != null) details.hours = hours;
+    const irrigationMinutes = num(form, "irrigationMinutes");
+    if (irrigationMinutes != null) details.irrigationMinutes = irrigationMinutes;
+  }
+  const sensorId = str(form, "sensorId");
+  if (sensorId) details.sensorId = sensorId;
+  const voiceLang = str(form, "voiceLang");
+  if (voiceLang) details.voiceLang = voiceLang;
+  const aiRaw = str(form, "aiSuggestion");
+  if (aiRaw) {
+    try {
+      details.aiSuggestion = JSON.parse(aiRaw) as AiSuggestion;
+    } catch {
+      /* ignore */
+    }
+  }
   return details;
 }
 
 export async function createObservationAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!canPersistFarmData()) {
-    return { ok: false as const, error: "Add DATABASE_URL to save logs on Vercel." };
+    return { ok: false as const, error: "Add Railway DATABASE_URL to save logs on Vercel." };
   }
 
   const domainRaw = str(formData, "domain");
@@ -134,11 +197,21 @@ export async function createObservationAction(formData: FormData) {
     return { ok: false as const, error: "Pick a farm domain." };
   }
 
-  const file = photoFile(formData);
-  const photoUrl = file ? await uploadPhoto(file) : null;
+  let photoUrl: string | null = null;
+  try {
+    const file = photoFile(formData);
+    photoUrl = file ? await uploadPhoto(file) : null;
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Photo upload failed." };
+  }
+
   const weather = weatherSnapshot(await getFarmWeather());
   const details = detailsFromForm(domainRaw, formData);
   const treeId = str(formData, "treeId") || null;
+  const plotId = str(formData, "plotId") || null;
+  const animalId = str(formData, "animalId") || null;
+  const role = farmRole(session.user?.email);
+  const source = sourceValue(str(formData, "source"), role);
 
   await insertObservation({
     domain: domainRaw,
@@ -151,6 +224,10 @@ export async function createObservationAction(formData: FormData) {
     weather,
     details: Object.keys(details).length ? details : null,
     treeId,
+    plotId,
+    animalId,
+    source,
+    createdBy: session.user?.email ?? null,
   });
 
   if (treeId && domainRaw === "plant_health") {
@@ -165,9 +242,9 @@ export async function createObservationAction(formData: FormData) {
 }
 
 export async function createTreeAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!canPersistFarmData()) {
-    return { ok: false as const, error: "Add DATABASE_URL to save trees on Vercel." };
+    return { ok: false as const, error: "Add Railway DATABASE_URL to save trees on Vercel." };
   }
 
   const lat = num(formData, "lat");
@@ -196,8 +273,13 @@ export async function createTreeAction(formData: FormData) {
 
   await upsertSpecies(species, str(formData, "tamil") || null);
 
-  const file = photoFile(formData);
-  const photoUrl = file ? await uploadPhoto(file) : null;
+  let photoUrl: string | null = null;
+  try {
+    const file = photoFile(formData);
+    photoUrl = file ? await uploadPhoto(file) : null;
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Photo upload failed." };
+  }
   const health = healthValue(str(formData, "health"));
   const habit = habitValue(str(formData, "habit"));
   const plantingYear = num(formData, "plantingYear");
@@ -239,6 +321,10 @@ export async function createTreeAction(formData: FormData) {
     weather,
     details: { crop: species, action: "census" },
     treeId: tree.id,
+    plotId: str(formData, "plotId") || null,
+    animalId: null,
+    source: farmRole(session.user?.email) === "staff" ? "staff" : "operator",
+    createdBy: session.user?.email ?? null,
   });
 
   revalidateAdmin();
@@ -281,7 +367,15 @@ export async function suggestTreeVisionAction(formData: FormData) {
   await requireAdmin();
   const file = photoFile(formData);
   if (!file) return { ok: false as const, error: "Take a photo first." };
-  const suggestion = await suggestFromImage(file);
+  const packRaw = str(formData, "pack") as VisionPack | "";
+  const domainRaw = str(formData, "domain");
+  const pack: VisionPack =
+    packRaw === "tree" || packRaw === "plant_health" || packRaw === "compost" || packRaw === "cattle"
+      ? packRaw
+      : isObservationDomain(domainRaw)
+        ? visionPackForDomain(domainRaw)
+        : "tree";
+  const suggestion = await suggestFromImage(file, pack);
   if (!suggestion) {
     return { ok: false as const, error: "Vision is off or could not read this photo." };
   }
@@ -324,4 +418,85 @@ export async function getTreeDetailAction(id: string) {
       photoUrl: row.photoUrl,
     })),
   };
+}
+
+export async function refreshBriefAction() {
+  await requireAdmin();
+  if (!canPersistFarmData()) return;
+  await generateFarmBrief("weekly");
+  revalidateAdmin();
+}
+
+export async function deriveTasksAction() {
+  await requireAdmin();
+  if (!canPersistFarmData()) return;
+  await deriveFarmTasks();
+  revalidateAdmin();
+}
+
+export async function completeTaskAction(formData: FormData) {
+  await requireAdmin();
+  const id = str(formData, "id");
+  if (!id) return;
+  await completeTask(id, null);
+  revalidateAdmin();
+}
+
+export async function createPlotAction(formData: FormData) {
+  await requireAdmin();
+  const name = str(formData, "name");
+  if (!name) return;
+  const kindRaw = str(formData, "kind");
+  const kind: PlotKind = plotKindOptions.some((opt) => opt.value === kindRaw)
+    ? (kindRaw as PlotKind)
+    : "other";
+  await insertPlot({ name, kind, polygon: null, note: str(formData, "note") || null });
+  revalidateAdmin();
+}
+
+export async function savePlotPolygonAction(id: string, points: { lat: number; lng: number }[]) {
+  await requireAdmin();
+  if (!id || points.length < 3) return { ok: false as const, error: "Walk at least three points." };
+  const ring = [...points];
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first.lat !== last.lat || first.lng !== last.lng) ring.push(first);
+  await updatePlot(id, {
+    polygon: { type: "Polygon", coordinates: [ring.map((point) => [point.lng, point.lat])] },
+  });
+  revalidateAdmin();
+  return { ok: true as const };
+}
+
+export async function createAnimalAction(formData: FormData) {
+  await requireAdmin();
+  const name = str(formData, "name");
+  if (!name) return;
+  await insertAnimal({
+    name,
+    species: str(formData, "species") || "Cattle",
+    sex: str(formData, "sex") || null,
+    tag: str(formData, "tag") || null,
+    bornOn: null,
+    status: str(formData, "status") || "active",
+    note: str(formData, "note") || null,
+  });
+  revalidateAdmin();
+}
+
+export async function createLedgerAction(formData: FormData) {
+  await requireOperator();
+  const amount = num(formData, "amount");
+  if (amount == null) return;
+  const kindRaw = str(formData, "kind");
+  const kind: LedgerKind = kindRaw === "income" ? "income" : "expense";
+  await insertLedger({
+    occurredAt: new Date(),
+    kind,
+    category: str(formData, "category") || "Other",
+    amount,
+    note: str(formData, "note") || null,
+    observationId: null,
+  });
+  revalidateAdmin();
 }

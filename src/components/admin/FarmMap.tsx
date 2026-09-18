@@ -7,7 +7,7 @@ import {
   suggestTreeVisionAction,
 } from "@/app/admin/actions";
 import { GpsBadge, useGps } from "@/components/admin/GpsBadge";
-import type { AiSuggestion, TreeHealth, ZoneRow } from "@/db/schema";
+import type { AiSuggestion, GeoPolygon, TreeHealth, ZoneRow } from "@/db/schema";
 import {
   DUPLICATE_TREE_METERS,
   farmCoords,
@@ -40,6 +40,20 @@ export type TreePin = {
   zone: string | null;
 };
 
+export type PlotPin = {
+  id: string;
+  name: string;
+  kind: string;
+  polygon: GeoPolygon | null;
+};
+
+export type HealthEvent = {
+  id: string;
+  lat: number;
+  lng: number;
+  label: string;
+};
+
 const HEALTH_COLOR: Record<TreeHealth, string> = {
   healthy: "#7eb13a",
   watch: "#c4a035",
@@ -53,11 +67,17 @@ export function FarmMap({
   trees,
   species,
   zones,
+  plots = [],
+  healthEvents = [],
+  droneTileUrl = null,
   visionEnabled,
 }: {
   trees: TreePin[];
   species: { name: string; tamil: string | null }[];
   zones: Pick<ZoneRow, "name" | "polygon">[];
+  plots?: PlotPin[];
+  healthEvents?: HealthEvent[];
+  droneTileUrl?: string | null;
   visionEnabled: boolean;
 }) {
   const router = useRouter();
@@ -75,7 +95,12 @@ export function FarmMap({
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getTreeDetailAction>>>(null);
   const [boundaryOn, setBoundaryOn] = useState(false);
   const [boundaryPts, setBoundaryPts] = useState<{ lat: number; lng: number }[]>([]);
+  const [showPlots, setShowPlots] = useState(true);
+  const [showHealth, setShowHealth] = useState(false);
+  const [showDrone, setShowDrone] = useState(Boolean(droneTileUrl));
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [pending, start] = useTransition();
+  const droneTiles = droneTileUrl;
 
   const filtered = useMemo(
     () =>
@@ -178,6 +203,48 @@ export function FarmMap({
         source: "boundary",
         paint: { "line-color": "#e8efd4", "line-width": 2, "line-dasharray": [2, 1] },
       });
+      map.addSource("plots", { type: "geojson", data: emptyFc() });
+      map.addLayer({
+        id: "plots-fill",
+        type: "fill",
+        source: "plots",
+        paint: { "fill-color": "#c4a035", "fill-opacity": 0.22 },
+      });
+      map.addLayer({
+        id: "plots-line",
+        type: "line",
+        source: "plots",
+        paint: { "line-color": "#f2c14e", "line-width": 2 },
+      });
+      map.addSource("health", { type: "geojson", data: emptyFc() });
+      map.addLayer({
+        id: "health-dots",
+        type: "circle",
+        source: "health",
+        paint: {
+          "circle-radius": 8,
+          "circle-color": "#c45c32",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#f7f4ea",
+        },
+      });
+      if (droneTiles) {
+        map.addSource("drone", {
+          type: "raster",
+          tiles: [droneTiles],
+          tileSize: 256,
+        });
+        map.addLayer(
+          {
+            id: "drone",
+            type: "raster",
+            source: "drone",
+            layout: { visibility: "visible" },
+            paint: { "raster-opacity": 0.85 },
+          },
+          "boundary-fill",
+        );
+      }
     });
     map.on("click", "tree-dots", (event: MapLayerMouseEvent) => {
       const id = event.features?.[0]?.properties?.id as string | undefined;
@@ -204,6 +271,8 @@ export function FarmMap({
       map.remove();
       mapRef.current = null;
     };
+    // Created once on mount; drone tiles are read at boot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -248,6 +317,50 @@ export function FarmMap({
       source.setData(emptyFc());
     }
   }, [zones, boundaryPts]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getSource("plots")) return;
+    const source = map.getSource("plots") as GeoJSONSource;
+    if (!showPlots) {
+      source.setData(emptyFc());
+      return;
+    }
+    source.setData({
+      type: "FeatureCollection",
+      features: plots
+        .filter((plot) => plot.polygon)
+        .map((plot) => ({
+          type: "Feature" as const,
+          geometry: plot.polygon as GeoPolygon,
+          properties: { id: plot.id, name: plot.name, kind: plot.kind },
+        })),
+    });
+  }, [plots, showPlots]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getSource("health")) return;
+    const source = map.getSource("health") as GeoJSONSource;
+    if (!showHealth) {
+      source.setData(emptyFc());
+      return;
+    }
+    source.setData({
+      type: "FeatureCollection",
+      features: healthEvents.map((event) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [event.lng, event.lat] },
+        properties: { id: event.id, label: event.label },
+      })),
+    });
+  }, [healthEvents, showHealth]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getLayer("drone")) return;
+    map.setLayoutProperty("drone", "visibility", showDrone ? "visible" : "none");
+  }, [showDrone]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -321,56 +434,107 @@ export function FarmMap({
   const speciesNames = useMemo(() => Array.from(new Set(trees.map((t) => t.species))).sort(), [trees]);
 
   return (
-    <div className="relative h-[calc(100dvh-8.6rem)] overflow-hidden bg-soil">
+    <div className="relative h-full min-h-[24rem] overflow-hidden bg-soil">
       <div ref={container} className="absolute inset-0" />
 
-      <div className="absolute inset-x-0 top-0 z-10 space-y-2 p-3">
-        <div className="rounded-2xl bg-paper/95 px-3 py-2 shadow">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">
-              {trees.length} / {treeCensusTarget} trees
+      <div className="absolute inset-x-0 top-0 z-10 p-3">
+        <div className="rounded-[1.25rem] bg-paper/95 px-3 py-2 shadow">
+          <div className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 text-sm font-semibold">
+              {trees.length} / {treeCensusTarget}
               {watchCount ? <span className="ml-2 text-clay">{watchCount} on watch</span> : null}
             </p>
-            <GpsBadge fix={fix} error={error} />
+            <span className="shrink-0 rounded-full bg-cream px-2 py-1">
+              <GpsBadge fix={fix} error={error} />
+            </span>
+            <button
+              type="button"
+              data-on={filtersOpen ? "true" : "false"}
+              className="admin-chip shrink-0"
+              onClick={() => setFiltersOpen((value) => !value)}
+            >
+              Filters
+            </button>
           </div>
-          <div className="mt-2 flex gap-2 overflow-x-auto">
-            <Chip on={healthFilter === "all"} onClick={() => setHealthFilter("all")}>
-              All
-            </Chip>
-            {healthOptions.map((opt) => (
-              <Chip key={opt.value} on={healthFilter === opt.value} onClick={() => setHealthFilter(opt.value)}>
-                {opt.label}
-              </Chip>
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2 overflow-x-auto">
-            <Chip on={speciesFilter === "all"} onClick={() => setSpeciesFilter("all")}>
-              Every species
-            </Chip>
-            {speciesNames.map((name) => (
-              <Chip key={name} on={speciesFilter === name} onClick={() => setSpeciesFilter(name)}>
-                {name}
-              </Chip>
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2 overflow-x-auto">
-            <Chip on={yearFilter === "all"} onClick={() => setYearFilter("all")}>
-              Any year
-            </Chip>
-            {YEARS.map((year) => (
-              <Chip key={year} on={yearFilter === String(year)} onClick={() => setYearFilter(String(year))}>
-                {year}
-              </Chip>
-            ))}
-          </div>
+          {filtersOpen ? (
+            <div className="mt-3 space-y-2 border-t border-line pt-3">
+              <div className="flex gap-2 overflow-x-auto">
+                <Chip on={healthFilter === "all"} onClick={() => setHealthFilter("all")}>
+                  All
+                </Chip>
+                {healthOptions.map((opt) => (
+                  <Chip key={opt.value} on={healthFilter === opt.value} onClick={() => setHealthFilter(opt.value)}>
+                    {opt.label}
+                  </Chip>
+                ))}
+              </div>
+              <div className="flex gap-2 overflow-x-auto">
+                <Chip on={speciesFilter === "all"} onClick={() => setSpeciesFilter("all")}>
+                  Every species
+                </Chip>
+                {speciesNames.map((name) => (
+                  <Chip key={name} on={speciesFilter === name} onClick={() => setSpeciesFilter(name)}>
+                    {name}
+                  </Chip>
+                ))}
+              </div>
+              <div className="flex gap-2 overflow-x-auto">
+                <Chip on={yearFilter === "all"} onClick={() => setYearFilter("all")}>
+                  Any year
+                </Chip>
+                {YEARS.map((year) => (
+                  <Chip key={year} on={yearFilter === String(year)} onClick={() => setYearFilter(String(year))}>
+                    {year}
+                  </Chip>
+                ))}
+              </div>
+              <div className="flex gap-2 overflow-x-auto">
+                <Chip on={showPlots} onClick={() => setShowPlots((value) => !value)}>
+                  Plots
+                </Chip>
+                <Chip on={showHealth} onClick={() => setShowHealth((value) => !value)}>
+                  Health clusters
+                </Chip>
+                {droneTileUrl ? (
+                  <Chip on={showDrone} onClick={() => setShowDrone((value) => !value)}>
+                    Drone layer
+                  </Chip>
+                ) : null}
+              </div>
+              {boundaryOn ? (
+                <button
+                  type="button"
+                  className="text-sm font-semibold text-leaf-deep"
+                  onClick={() => {
+                    setBoundaryOn(false);
+                    setBoundaryPts([]);
+                  }}
+                >
+                  Cancel boundary walk
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="text-sm font-semibold text-leaf-deep"
+                  onClick={() => {
+                    setBoundaryPts([]);
+                    setBoundaryOn(true);
+                    setFiltersOpen(false);
+                  }}
+                >
+                  Walk boundary
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="absolute bottom-4 right-3 z-10 flex flex-col items-end gap-2">
+      <div className="absolute bottom-4 right-3 z-10">
         {boundaryOn ? (
           <button
             type="button"
-            className="tap rounded-full bg-cream px-4 text-sm font-semibold text-leaf-deep shadow"
+            className="tap rounded-full bg-cream px-5 text-base font-semibold text-leaf-deep shadow-lg"
             onClick={() => {
               start(async () => {
                 const result = await saveBoundaryAction(boundaryPts);
@@ -387,22 +551,12 @@ export function FarmMap({
         ) : (
           <button
             type="button"
-            className="tap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow"
-            onClick={() => {
-              setBoundaryPts([]);
-              setBoundaryOn(true);
-            }}
+            onClick={startAdd}
+            className="tap rounded-full bg-leaf px-6 text-base font-semibold text-leaf-deep shadow-lg"
           >
-            Walk boundary
+            Add tree
           </button>
         )}
-        <button
-          type="button"
-          onClick={startAdd}
-          className="tap rounded-full bg-leaf px-5 text-base font-semibold text-leaf-deep shadow-lg"
-        >
-          Add tree
-        </button>
       </div>
 
       {adding && draft ? (
@@ -424,7 +578,7 @@ export function FarmMap({
       ) : null}
 
       {detail?.tree && !adding ? (
-        <div className="absolute inset-x-0 bottom-0 z-20 max-h-[55%] overflow-y-auto rounded-t-3xl bg-paper p-4 shadow-2xl">
+        <div className="absolute inset-x-0 bottom-0 z-20 max-h-[55%] overflow-y-auto rounded-t-[1.75rem] bg-paper p-5 shadow-2xl">
           <div className="flex gap-3">
             {detail.tree.photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -436,8 +590,8 @@ export function FarmMap({
               />
             )}
             <div className="min-w-0 flex-1">
-              <p className="font-display text-2xl leading-tight">{detail.tree.species}</p>
-              <p className="text-sm text-ink-soft">
+              <p className="font-display text-3xl leading-tight">{detail.tree.species}</p>
+              <p className="mt-1 text-base text-ink-soft">
                 {treeAgeLabel(detail.tree.plantingYear, detail.tree.plantedOn)} · {detail.tree.health}
                 {detail.tree.habit ? ` · ${detail.tree.habit}` : ""}
               </p>
@@ -501,11 +655,12 @@ function TreeCapture({
   const [year, setYear] = useState(2024);
   const [speciesName, setSpeciesName] = useState(species[0]?.name ?? "");
   const [ai, setAi] = useState<AiSuggestion | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const nearby = nearestPoints(draft, trees, DUPLICATE_TREE_METERS);
 
   return (
     <form
-      className="absolute inset-x-0 bottom-0 z-30 max-h-[78%] overflow-y-auto rounded-t-3xl bg-paper p-4 shadow-2xl"
+      className="absolute inset-x-0 bottom-0 z-30 max-h-[78%] overflow-y-auto rounded-t-[1.75rem] bg-paper p-5 shadow-2xl"
       action={(formData) => {
         setMessage(null);
         start(async () => {
@@ -526,14 +681,14 @@ function TreeCapture({
       }}
     >
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-display text-2xl">New tree</h2>
+        <h2 className="font-display text-3xl">New tree</h2>
         <button type="button" onClick={onClose} className="text-sm text-muted">
           Cancel
         </button>
       </div>
-      <p className="text-xs text-muted">
-        Stand at the stem. Drag the red pin if GPS drifts. Accuracy{" "}
-        {draft.accuracy != null ? `±${Math.round(draft.accuracy)} m` : "map pin"}.
+      <p className="text-sm text-ink-soft">
+        Stand at the stem. Drag the red pin if GPS drifts.{" "}
+        {draft.accuracy != null ? `±${Math.round(draft.accuracy)} m` : "Map pin."}
       </p>
 
       <input type="hidden" name="lat" value={draft.lat} />
@@ -545,16 +700,17 @@ function TreeCapture({
       <input type="hidden" name="force" value={force ? "1" : ""} />
       {ai ? <input type="hidden" name="aiSuggestion" value={JSON.stringify(ai)} /> : null}
 
-      <label className="mt-3 block">
-        <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-muted">Photo</span>
+      <label className="admin-camera mt-4">
         <input
           name="photo"
           type="file"
           accept="image/*"
           capture="environment"
-          className="tap w-full rounded-2xl border border-line bg-white px-3 text-sm"
+          className="sr-only"
           onChange={(event) => {
             const file = event.target.files?.[0];
+            if (preview) URL.revokeObjectURL(preview);
+            setPreview(file ? URL.createObjectURL(file) : null);
             if (!file || !visionEnabled) return;
             const fd = new FormData();
             fd.set("photo", file);
@@ -571,6 +727,12 @@ function TreeCapture({
             });
           }}
         />
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={preview} alt="" />
+        ) : (
+          <span className="px-4 text-center text-base font-semibold text-ink-soft">Tap to photograph this stem</span>
+        )}
       </label>
 
       {ai ? (

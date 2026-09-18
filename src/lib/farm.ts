@@ -1,5 +1,10 @@
 import { landUnits, site } from "@/lib/site";
-import type { ObservationDomain, TreeHabit, TreeHealth } from "@/db/schema";
+import type {
+  ObservationDomain,
+  PlotKind,
+  TreeHabit,
+  TreeHealth,
+} from "@/db/schema";
 
 export const farmCoords = {
   lat: site.location.lat,
@@ -18,12 +23,13 @@ export const domains: {
   { slug: "trees", label: "Trees", tamil: "மரம்", hint: "Plant, prune, water, census" },
   { slug: "plants", label: "Plants", tamil: "செடி", hint: "Beds, stage, what is coming up" },
   { slug: "soil", label: "Soil", tamil: "மண்", hint: "Compost, mulch, moisture" },
-  { slug: "rain", label: "Rain", tamil: "மழை", hint: "Rainfall and pond" },
+  { slug: "rain", label: "Rain & water", tamil: "மழை", hint: "Rain, pond, drip, solar pump" },
   { slug: "harvest", label: "Harvest", tamil: "அறுவடை", hint: "What came off the land" },
-  { slug: "animals", label: "Animals", tamil: "கால்நடை", hint: "Cattle and husbandry" },
+  { slug: "animals", label: "Animals", tamil: "கால்நடை", hint: "Cattle, feed, manure" },
   { slug: "plant_health", label: "Plant health", tamil: "நலம்", hint: "Pests, stress, recovery", photoDefault: true },
   { slug: "stay", label: "Farm stay", tamil: "தங்கல்", hint: "Guests and occupancy" },
-  { slug: "activity", label: "Activities", tamil: "நிகழ்வு", hint: "Walks, workshops, days on the land" },
+  { slug: "activity", label: "Activities", tamil: "நிகழ்வு", hint: "Walks, workshops, labour on the land" },
+  { slug: "kit", label: "Kit & energy", tamil: "கருவி", hint: "Solar pump, drip, tools" },
 ];
 
 export const domainBySlug = Object.fromEntries(domains.map((d) => [d.slug, d])) as Record<
@@ -66,9 +72,48 @@ export const seedSpecies: { name: string; tamil: string; category: string }[] = 
   { name: "Cashew", tamil: "முந்திரி", category: "fruit" },
 ];
 
-export const harvestCrops = ["Vegetables", "Spinach", "Sesame", "Urad dal", "Fruit", "Other"];
+export const harvestCrops = [
+  "Vegetables",
+  "Spinach",
+  "Keerai",
+  "Sesame",
+  "Urad dal",
+  "Gourd",
+  "Watermelon",
+  "Passion fruit",
+  "Fruit",
+  "Other",
+];
 
-export const activityTypes = ["Walk", "Workshop", "Picnic", "Stay day", "Other"];
+export const activityTypes = ["Walk", "Workshop", "Picnic", "Stay day", "Labour", "Other"];
+
+export const plotKindOptions: { value: PlotKind; label: string }[] = [
+  { value: "horticulture", label: "Horticulture" },
+  { value: "solo", label: "Solo crop" },
+  { value: "animal", label: "Animal yard" },
+  { value: "pond", label: "Pond" },
+  { value: "trees", label: "Tree belt" },
+  { value: "other", label: "Other" },
+];
+
+export const seedPlots: { name: string; kind: PlotKind }[] = [
+  { name: "Horticulture beds", kind: "horticulture" },
+  { name: "Solo crop", kind: "solo" },
+  { name: "Animal yard", kind: "animal" },
+  { name: "Sensei pond", kind: "pond" },
+  { name: "North tree belt", kind: "trees" },
+  { name: "South tree belt", kind: "trees" },
+];
+
+export const harvestDestinations = ["House", "Gift", "Sale"];
+
+export const pondLevels = ["Low", "Ok", "High"];
+
+export const kitItems = ["Solar pump", "Drip", "Tank", "Tool", "Other"];
+
+export const kitStatuses = ["On", "Off", "Fault", "Borrowed", "Fixed"];
+
+export const ledgerCategories = ["Seed", "Labour", "Diesel", "Feed", "Kit", "Produce sold", "Other"];
 
 export const DUPLICATE_TREE_METERS = 4;
 
@@ -105,6 +150,14 @@ export function isGoogleAuthConfigured() {
 
 export function isBlobConfigured() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
+export function isPublicHarvestEnabled() {
+  return process.env.PUBLIC_HARVEST_FROM_LOG !== "0";
+}
+
+export function droneTileUrl() {
+  return process.env.FARM_DRONE_TILE_URL?.trim() || null;
 }
 
 export function timeAgo(date: Date | string | null | undefined) {

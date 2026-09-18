@@ -1,7 +1,7 @@
 {
-  "name": "Samanya farm log",
-  "short_name": "Farm log",
-  "description": "Field notes, weather, and tree census for ET Samanya Farms.",
+  "name": "Samanya Farm OS",
+  "short_name": "Farm OS",
+  "description": "Field notes, briefs, and tree census for ET Samanya Farms.",
   "start_url": "/admin",
   "scope": "/admin",
   "display": "standalone",

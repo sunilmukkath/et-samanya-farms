@@ -14,7 +14,7 @@ export default async function DomainLogPage({
   const rows = await listObservations({ domain, limit: 60 });
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-5">
+    <div className="mx-auto max-w-xl px-4 py-5">
       <p className="font-tamil text-sm text-muted">{meta.tamil}</p>
       <h1 className="font-display text-4xl">{meta.label}</h1>
       <Link

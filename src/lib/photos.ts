@@ -18,6 +18,10 @@ export async function uploadPhoto(file: File) {
     return blob.url;
   }
 
+  if (process.env.VERCEL === "1") {
+    throw new Error("Add BLOB_READ_WRITE_TOKEN so photos persist on Vercel.");
+  }
+
   const dir = path.join(process.cwd(), "public", "uploads");
   await mkdir(dir, { recursive: true });
   const buffer = Buffer.from(await file.arrayBuffer());
