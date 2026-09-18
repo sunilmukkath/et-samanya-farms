@@ -2,13 +2,17 @@ import { desc, eq, gte, sql } from "drizzle-orm";
 import { fileStore } from "@/db/file-store";
 import { ensureSchema, getDb, isDatabaseConfigured } from "@/db/index";
 import {
+  deviceReadings,
+  farmDevices,
   farmZones,
   observations,
   speciesCatalog,
   trees,
+  type DeviceRow,
   type GeoPolygon,
   type ObservationDomain,
   type ObservationRow,
+  type ReadingRow,
   type SpeciesRow,
   type TreeHealth,
   type TreeRow,
@@ -18,7 +22,7 @@ import { nearestPoints } from "@/lib/geo";
 
 export { isDatabaseConfigured };
 
-function useFileStore() {
+function usingFileStore() {
   return !isDatabaseConfigured() && process.env.VERCEL !== "1";
 }
 
@@ -32,14 +36,14 @@ async function db() {
 }
 
 export async function listSpecies(): Promise<SpeciesRow[]> {
-  if (useFileStore()) return fileStore.listSpecies();
+  if (usingFileStore()) return fileStore.listSpecies();
   if (!isDatabaseConfigured()) return [];
   const client = await db();
   return client.select().from(speciesCatalog).orderBy(speciesCatalog.name);
 }
 
 export async function upsertSpecies(name: string, tamil?: string | null) {
-  if (useFileStore()) return fileStore.upsertSpecies(name, tamil);
+  if (usingFileStore()) return fileStore.upsertSpecies(name, tamil);
   const trimmed = name.trim();
   if (!trimmed) return;
   const client = await db();
@@ -61,14 +65,14 @@ export async function upsertSpecies(name: string, tamil?: string | null) {
 }
 
 export async function listZones(): Promise<ZoneRow[]> {
-  if (useFileStore()) return fileStore.listZones();
+  if (usingFileStore()) return fileStore.listZones();
   if (!isDatabaseConfigured()) return [];
   const client = await db();
   return client.select().from(farmZones).orderBy(farmZones.name);
 }
 
 export async function saveFarmBoundary(polygon: GeoPolygon | null) {
-  if (useFileStore()) return fileStore.saveFarmBoundary(polygon);
+  if (usingFileStore()) return fileStore.saveFarmBoundary(polygon);
   const client = await db();
   const existing = await client
     .select()
@@ -88,14 +92,14 @@ export async function saveFarmBoundary(polygon: GeoPolygon | null) {
 }
 
 export async function listTrees(): Promise<TreeRow[]> {
-  if (useFileStore()) return fileStore.listTrees();
+  if (usingFileStore()) return fileStore.listTrees();
   if (!isDatabaseConfigured()) return [];
   const client = await db();
   return client.select().from(trees).orderBy(desc(trees.createdAt));
 }
 
 export async function getTree(id: string): Promise<TreeRow | null> {
-  if (useFileStore()) return fileStore.getTree(id);
+  if (usingFileStore()) return fileStore.getTree(id);
   if (!isDatabaseConfigured()) return null;
   const client = await db();
   const rows = await client.select().from(trees).where(eq(trees.id, id)).limit(1);
@@ -112,7 +116,7 @@ export async function insertTree(input: NewTree) {
     createdAt: now,
     updatedAt: now,
   };
-  if (useFileStore()) return fileStore.insertTree(row);
+  if (usingFileStore()) return fileStore.insertTree(row);
   const client = await db();
   await client.insert(trees).values(row);
   return row;
@@ -120,7 +124,7 @@ export async function insertTree(input: NewTree) {
 
 export async function updateTree(id: string, patch: Partial<Omit<TreeRow, "id" | "createdAt">>) {
   const next = { ...patch, updatedAt: new Date() };
-  if (useFileStore()) return fileStore.updateTree(id, next);
+  if (usingFileStore()) return fileStore.updateTree(id, next);
   const client = await db();
   await client.update(trees).set(next).where(eq(trees.id, id));
 }
@@ -141,7 +145,7 @@ export async function insertObservation(input: NewObservation) {
     id: input.id ?? crypto.randomUUID(),
     createdAt: new Date(),
   };
-  if (useFileStore()) return fileStore.insertObservation(row);
+  if (usingFileStore()) return fileStore.insertObservation(row);
   const client = await db();
   await client.insert(observations).values(row);
   return row;
@@ -154,7 +158,7 @@ export async function listObservations(
     limit?: number;
   } = {},
 ): Promise<ObservationRow[]> {
-  if (useFileStore()) return fileStore.listObservations(opts);
+  if (usingFileStore()) return fileStore.listObservations(opts);
   if (!isDatabaseConfigured()) return [];
   const client = await db();
   const limit = opts.limit ?? 80;
@@ -177,8 +181,93 @@ export async function listObservations(
   return client.select().from(observations).orderBy(desc(observations.occurredAt)).limit(limit);
 }
 
+export type NewDevice = Omit<DeviceRow, "id" | "createdAt" | "updatedAt"> & { id?: string };
+
+export async function insertDevice(input: NewDevice) {
+  const now = new Date();
+  const row: DeviceRow = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  if (usingFileStore()) return fileStore.insertDevice(row);
+  const client = await db();
+  await client.insert(farmDevices).values(row);
+  return row;
+}
+
+export async function listDevices(): Promise<DeviceRow[]> {
+  if (usingFileStore()) return fileStore.listDevices();
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  return client.select().from(farmDevices).orderBy(farmDevices.name);
+}
+
+export async function getDevice(id: string): Promise<DeviceRow | null> {
+  if (usingFileStore()) return fileStore.getDevice(id);
+  if (!isDatabaseConfigured()) return null;
+  const client = await db();
+  const rows = await client.select().from(farmDevices).where(eq(farmDevices.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getDeviceByToken(token: string): Promise<DeviceRow | null> {
+  if (usingFileStore()) return fileStore.getDeviceByToken(token);
+  if (!isDatabaseConfigured()) return null;
+  const client = await db();
+  const rows = await client.select().from(farmDevices).where(eq(farmDevices.token, token)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateDevice(id: string, patch: Partial<Omit<DeviceRow, "id" | "createdAt">>) {
+  const next = { ...patch, updatedAt: new Date() };
+  if (usingFileStore()) return fileStore.updateDevice(id, next);
+  const client = await db();
+  await client.update(farmDevices).set(next).where(eq(farmDevices.id, id));
+}
+
+export async function deleteDevice(id: string) {
+  if (usingFileStore()) return fileStore.deleteDevice(id);
+  const client = await db();
+  await client.delete(deviceReadings).where(eq(deviceReadings.deviceId, id));
+  await client.delete(farmDevices).where(eq(farmDevices.id, id));
+}
+
+export type NewReading = Omit<ReadingRow, "id" | "createdAt"> & { id?: string };
+
+export async function insertReading(input: NewReading) {
+  const row: ReadingRow = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    createdAt: new Date(),
+  };
+  if (usingFileStore()) return fileStore.insertReading(row);
+  const client = await db();
+  await client.insert(deviceReadings).values(row);
+  return row;
+}
+
+export async function listReadings(
+  opts: { deviceId?: string; limit?: number } = {},
+): Promise<ReadingRow[]> {
+  if (usingFileStore()) return fileStore.listReadings(opts);
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  const limit = opts.limit ?? 40;
+  if (opts.deviceId) {
+    return client
+      .select()
+      .from(deviceReadings)
+      .where(eq(deviceReadings.deviceId, opts.deviceId))
+      .orderBy(desc(deviceReadings.occurredAt))
+      .limit(limit);
+  }
+  return client.select().from(deviceReadings).orderBy(desc(deviceReadings.occurredAt)).limit(limit);
+}
+
 export async function dashboardStats() {
-  if (useFileStore()) return fileStore.dashboardStats();
+  if (usingFileStore()) return fileStore.dashboardStats();
   if (!isDatabaseConfigured()) return emptyDashboardStats();
   const client = await db();
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);

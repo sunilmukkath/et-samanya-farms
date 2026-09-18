@@ -19,6 +19,9 @@ export default async function AdminAppLayout({ children }: { children: React.Rea
           <Link href="/admin/map" className="tap inline-flex items-center rounded-full px-3 text-sm font-semibold text-cream">
             Map
           </Link>
+          <Link href="/admin/kit" className="tap inline-flex items-center rounded-full px-3 text-sm font-semibold text-cream">
+            Kit
+          </Link>
           <Link href="/admin/log" className="tap inline-flex items-center rounded-full bg-leaf px-4 text-sm font-semibold text-leaf-deep">
             Log
           </Link>
@@ -36,12 +39,15 @@ export default async function AdminAppLayout({ children }: { children: React.Rea
       </header>
       <div className="flex-1 bg-paper text-ink">{children}</div>
       <nav className="sticky bottom-0 z-30 border-t border-white/10 bg-leaf-deep pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto grid max-w-3xl grid-cols-4 text-center text-xs font-semibold text-sand">
+        <div className="mx-auto grid max-w-3xl grid-cols-5 text-center text-xs font-semibold text-sand">
           <Link href="/admin" className="tap py-3 hover:text-cream">
             Home
           </Link>
           <Link href="/admin/map" className="tap py-3 hover:text-cream">
             Trees
+          </Link>
+          <Link href="/admin/kit" className="tap py-3 hover:text-cream">
+            Kit
           </Link>
           <Link href="/admin/log" className="tap py-3 hover:text-cream">
             Note

@@ -1,8 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
+  DeviceRow,
   GeoPolygon,
   ObservationRow,
+  ReadingRow,
   SpeciesRow,
   TreeRow,
   ZoneRow,
@@ -14,6 +16,8 @@ type FarmFile = {
   zones: ZoneRow[];
   trees: TreeRow[];
   observations: ObservationRow[];
+  devices: DeviceRow[];
+  readings: ReadingRow[];
 };
 
 const filePath = path.join(process.cwd(), ".data", "farm.json");
@@ -21,17 +25,28 @@ const filePath = path.join(process.cwd(), ".data", "farm.json");
 let cache: FarmFile | null = null;
 let chain: Promise<unknown> = Promise.resolve();
 
-function revive(data: FarmFile): FarmFile {
+function revive(data: Partial<FarmFile>): FarmFile {
   return {
-    species: data.species.map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
-    zones: data.zones.map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
-    trees: data.trees.map((row) => ({
+    species: (data.species ?? []).map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
+    zones: (data.zones ?? []).map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
+    trees: (data.trees ?? []).map((row) => ({
       ...row,
       plantedOn: row.plantedOn ? new Date(row.plantedOn) : null,
       createdAt: new Date(row.createdAt),
       updatedAt: new Date(row.updatedAt),
     })),
-    observations: data.observations.map((row) => ({
+    observations: (data.observations ?? []).map((row) => ({
+      ...row,
+      occurredAt: new Date(row.occurredAt),
+      createdAt: new Date(row.createdAt),
+    })),
+    devices: (data.devices ?? []).map((row) => ({
+      ...row,
+      lastSeenAt: row.lastSeenAt ? new Date(row.lastSeenAt) : null,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+    })),
+    readings: (data.readings ?? []).map((row) => ({
       ...row,
       occurredAt: new Date(row.occurredAt),
       createdAt: new Date(row.createdAt),
@@ -60,6 +75,8 @@ function seed(): FarmFile {
     ],
     trees: [],
     observations: [],
+    devices: [],
+    readings: [],
   };
 }
 
@@ -67,7 +84,7 @@ async function read(): Promise<FarmFile> {
   if (cache) return cache;
   try {
     const raw = await readFile(filePath, "utf8");
-    cache = revive(JSON.parse(raw) as FarmFile);
+    cache = revive(JSON.parse(raw) as Partial<FarmFile>);
     return cache;
   } catch {
     cache = seed();
@@ -172,6 +189,52 @@ export const fileStore = {
     return [...rows]
       .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
       .slice(0, opts.limit ?? 80);
+  },
+  insertDevice(row: DeviceRow) {
+    return mutate((data) => {
+      data.devices.unshift(row);
+      return row;
+    });
+  },
+  async listDevices() {
+    const data = await read();
+    return [...data.devices].sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async getDevice(id: string) {
+    const data = await read();
+    return data.devices.find((row) => row.id === id) ?? null;
+  },
+  async getDeviceByToken(token: string) {
+    const data = await read();
+    return data.devices.find((row) => row.token === token) ?? null;
+  },
+  updateDevice(id: string, patch: Partial<DeviceRow>) {
+    return mutate((data) => {
+      const row = data.devices.find((device) => device.id === id);
+      if (!row) return;
+      Object.assign(row, patch);
+    });
+  },
+  deleteDevice(id: string) {
+    return mutate((data) => {
+      data.devices = data.devices.filter((row) => row.id !== id);
+      data.readings = data.readings.filter((row) => row.deviceId !== id);
+    });
+  },
+  insertReading(row: ReadingRow) {
+    return mutate((data) => {
+      data.readings.unshift(row);
+      if (data.readings.length > 1500) data.readings.length = 1500;
+      return row;
+    });
+  },
+  async listReadings(opts: { deviceId?: string; limit?: number }) {
+    const data = await read();
+    let rows = data.readings;
+    if (opts.deviceId) rows = rows.filter((row) => row.deviceId === opts.deviceId);
+    return [...rows]
+      .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+      .slice(0, opts.limit ?? 40);
   },
   async dashboardStats() {
     const data = await read();

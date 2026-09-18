@@ -98,6 +98,43 @@ export async function ensureSchema() {
 
   await sql`CREATE INDEX IF NOT EXISTS observations_domain_occurred_idx ON observations (domain, occurred_at DESC)`;
 
+  await sql`CREATE TABLE IF NOT EXISTS farm_devices (
+    id text PRIMARY KEY,
+    kind text NOT NULL,
+    name text NOT NULL,
+    zone text,
+    vendor text,
+    model text,
+    token text NOT NULL,
+    status text NOT NULL DEFAULT 'planned',
+    last_seen_at timestamptz,
+    last_metrics jsonb,
+    desired_state text,
+    reported_state text,
+    stream_url text,
+    snapshot_url text,
+    note text,
+    lat double precision,
+    lng double precision,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS farm_devices_kind_idx ON farm_devices (kind)`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS farm_devices_token_idx ON farm_devices (token)`;
+
+  await sql`CREATE TABLE IF NOT EXISTS device_readings (
+    id text PRIMARY KEY,
+    device_id text NOT NULL,
+    occurred_at timestamptz NOT NULL DEFAULT now(),
+    metrics jsonb,
+    photo_url text,
+    note text,
+    lat double precision,
+    lng double precision,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS device_readings_device_occurred_idx ON device_readings (device_id, occurred_at DESC)`;
+
   const existingSpecies = await sql`SELECT count(*)::int AS count FROM species_catalog`;
   if (!existingSpecies[0]?.count) {
     for (const row of seedSpecies) {
