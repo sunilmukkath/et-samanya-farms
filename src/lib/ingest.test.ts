@@ -44,8 +44,12 @@ describe("commandFromDevice", () => {
 });
 
 describe("liveStatus", () => {
-  it("keeps planned devices planned", () => {
-    assert.equal(liveStatus({ status: "planned", lastSeenAt: new Date() }), "planned");
+  it("keeps planned devices planned until they speak", () => {
+    assert.equal(liveStatus({ status: "planned", lastSeenAt: null }), "planned");
+  });
+
+  it("treats a heard planned device as online", () => {
+    assert.equal(liveStatus({ status: "planned", lastSeenAt: new Date() }), "online");
   });
 
   it("marks stale gateways offline", () => {

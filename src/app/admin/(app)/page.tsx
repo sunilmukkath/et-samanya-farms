@@ -12,6 +12,7 @@ export default async function AdminHomePage() {
   const weather = await getFarmWeather();
   const watch = (stats.healthCounts.watch ?? 0) + (stats.healthCounts.stressed ?? 0);
   const onlineKit = devices.filter((row) => liveStatus(row) === "online");
+  const showcase = onlineKit.find((row) => row.kind === "sensor") ?? onlineKit[0];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5">
@@ -71,8 +72,8 @@ export default async function AdminHomePage() {
             )}
           </p>
           <p className="text-sm text-ink-soft">
-            {onlineKit[0]
-              ? metricLine(onlineKit[0].lastMetrics) || `${onlineKit[0].name} is up`
+            {showcase
+              ? metricLine(showcase.lastMetrics) || `${showcase.name} is up`
               : "Sensors, motors, CCTV, drone — what to buy, and how it posts here."}
           </p>
         </div>

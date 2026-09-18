@@ -219,7 +219,7 @@ export function liveStatus(input: {
   status: DeviceStatus;
   lastSeenAt?: Date | string | null;
 }): DeviceStatus {
-  if (input.status === "planned" || input.status === "error") return input.status;
+  if (input.status === "error") return input.status;
   if (!input.lastSeenAt) return input.status === "online" ? "offline" : input.status;
   const seen = new Date(input.lastSeenAt).getTime();
   if (Number.isNaN(seen)) return "offline";

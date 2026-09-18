@@ -2,6 +2,7 @@ import { applyDeviceIngest } from "@/lib/devices";
 import { canPersistFarmData, getDevice, getDeviceByToken } from "@/db/queries";
 import { commandFromDevice, bearerToken, parseIngestPayload } from "@/lib/ingest";
 import { uploadPhoto } from "@/lib/photos";
+import { revalidatePath } from "next/cache";
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +75,8 @@ export async function POST(request: NextRequest) {
 
   const reading = await applyDeviceIngest(device, parsed, photoUrl);
   const fresh = (await getDevice(device.id)) ?? device;
+  revalidatePath("/admin");
+  revalidatePath("/admin/kit");
 
   return json({
     ok: true,

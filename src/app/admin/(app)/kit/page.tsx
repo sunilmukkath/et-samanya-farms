@@ -13,6 +13,8 @@ import { site } from "@/lib/site";
 import type { DeviceRow, ReadingRow } from "@/db/schema";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminKitPage() {
   const [devices, readings] = await Promise.all([listDevices(), listReadings({ limit: 24 })]);
   const ingestUrl = `${site.url.replace(/\/$/, "")}/api/devices/ingest`;
