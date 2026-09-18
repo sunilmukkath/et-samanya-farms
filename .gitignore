@@ -44,3 +44,7 @@ next-env.d.ts
 # Brand design mocks (not shipped in the web app)
 /brand-mocks
 
+# Local farm log (when DATABASE_URL is unset)
+.data
+/public/uploads
+

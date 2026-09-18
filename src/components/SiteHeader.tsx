@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BrandMark } from "@/components/Marks";
+import { BrandLockup } from "@/components/Marks";
 import { site } from "@/lib/site";
 
 export function SiteHeader() {
@@ -13,16 +13,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3 sm:px-8">
-        <Link href="/" className="flex items-center gap-3" onClick={() => setOpen(false)}>
-          <BrandMark className="h-11 w-11" />
-          <span className="leading-tight">
-            <span className="block font-display text-lg tracking-tight text-ink sm:text-xl">
-              ET Samanya
-            </span>
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-              Farms
-            </span>
-          </span>
+        <Link href="/" onClick={() => setOpen(false)}>
+          <BrandLockup variant="ink" />
         </Link>
 
         <nav className="hidden items-center gap-7 text-sm font-medium text-ink-soft md:flex">
@@ -42,7 +34,7 @@ export function SiteHeader() {
 
         <Link
           href="/visit"
-          className="hidden rounded-full bg-leaf px-4 py-2 text-sm font-semibold text-cream md:inline-flex"
+          className="hidden rounded-full bg-leaf-deep px-4 py-2 text-sm font-semibold text-cream md:inline-flex"
         >
           Enquire
         </Link>

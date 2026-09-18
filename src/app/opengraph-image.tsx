@@ -12,8 +12,8 @@ export default function OpenGraphImage() {
           height: "100%",
           width: "100%",
           display: "flex",
-          background: "#173022",
-          color: "#f4ead8",
+          background: "#142414",
+          color: "#e8efd4",
           padding: 72,
           flexDirection: "column",
           justifyContent: "space-between",
@@ -24,7 +24,7 @@ export default function OpenGraphImage() {
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ fontSize: 84, lineHeight: 0.95, fontWeight: 500 }}>ET Samanya Farms</div>
-          <div style={{ marginTop: 18, fontSize: 32, color: "#d9a441" }}>
+          <div style={{ marginTop: 18, fontSize: 32, color: "#7eb13a" }}>
             Everyday food, grown among 1,600 trees.
           </div>
         </div>

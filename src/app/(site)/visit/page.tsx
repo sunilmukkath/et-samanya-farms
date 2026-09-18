@@ -33,10 +33,12 @@ export default function VisitPage() {
         <div>
           <div className="mb-8 overflow-hidden rounded-[1.75rem]">
             <FarmPhoto
-              src="/photos/pulses.jpg"
-              alt="Walking the pulse field"
-              className="h-48 w-full"
+              src="/photos/planting.jpg"
+              alt="Planting a sapling on the farm"
+              className="h-56 w-full"
               sizes="(min-width: 1024px) 45vw, 100vw"
+              width={768}
+              height={1024}
             />
           </div>
           <h2 className="font-display text-3xl">Send a note</h2>

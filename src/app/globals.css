@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --cream: #f4ead8;
-  --paper: #fbf6ec;
-  --sand: #e7d7b8;
-  --ink: #1c1610;
-  --ink-soft: #4a4036;
-  --muted: #6f6356;
-  --leaf: #2c4a32;
-  --leaf-deep: #173022;
-  --leaf-bright: #3f6b45;
+  --cream: #e8efd4;
+  --paper: #f7f4ea;
+  --sand: #d4dcb8;
+  --ink: #1a1c14;
+  --ink-soft: #3d4434;
+  --muted: #6a7360;
+  --leaf: #7eb13a;
+  --leaf-deep: #142414;
+  --leaf-bright: #9ccc4a;
   --clay: #c45c32;
   --clay-deep: #9a3f1e;
-  --sun: #d9a441;
-  --soil: #3b2418;
-  --line: rgba(28, 22, 16, 0.12);
-  --shadow: 0 18px 50px rgba(28, 22, 16, 0.08);
+  --sun: #c4a035;
+  --soil: #2a2414;
+  --line: rgba(20, 36, 20, 0.12);
+  --shadow: 0 18px 50px rgba(20, 36, 20, 0.08);
 }
 
 @theme inline {
@@ -63,8 +63,8 @@ body {
 
 .texture {
   background-image:
-    radial-gradient(1200px 500px at 10% -10%, rgba(217, 164, 65, 0.16), transparent 55%),
-    radial-gradient(900px 420px at 100% 0%, rgba(44, 74, 50, 0.12), transparent 50%);
+    radial-gradient(1200px 500px at 10% -10%, rgba(196, 160, 53, 0.16), transparent 55%),
+    radial-gradient(900px 420px at 100% 0%, rgba(126, 177, 58, 0.14), transparent 50%);
 }
 
 .grain {
@@ -110,4 +110,24 @@ body {
 
 .rise-delay {
   animation: rise 0.9s ease 0.12s both;
+}
+
+.tap {
+  min-height: 48px;
+}
+
+.admin-chip {
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 0 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: white;
+}
+
+.admin-chip[data-on="true"] {
+  background: var(--leaf-deep);
+  color: var(--cream);
+  border-color: transparent;
 }

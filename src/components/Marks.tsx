@@ -1,22 +1,29 @@
-export function BrandMark({ className = "h-12 w-12" }: { className?: string }) {
+import Image from "next/image";
+
+export function BrandLockup({
+  variant = "ink",
+  className = "",
+}: {
+  variant?: "ink" | "white";
+  className?: string;
+}) {
+  const src = variant === "white" ? "/brand/lockup-white.png" : "/brand/lockup-ink.png";
+  const label = variant === "white" ? "text-sand" : "text-muted";
+
   return (
-    <svg
-      viewBox="0 0 64 64"
-      className={className}
-      aria-hidden="true"
-      fill="none"
-    >
-      <circle cx="32" cy="32" r="30" fill="#173022" />
-      <path
-        d="M32 50c0-14 10.5-22 10.5-31.5C42.5 12 36 8 32 8s-10.5 4-10.5 10.5C21.5 28 32 36 32 50Z"
-        fill="#d9a441"
+    <span className={`inline-flex items-center gap-3 ${className}`}>
+      <Image
+        src={src}
+        alt="Sāmānya"
+        width={378}
+        height={137}
+        className="h-9 w-auto sm:h-10"
+        priority
       />
-      <path
-        d="M32 22c-6 6-11 9-16 9 4-1 8-6 10-12 2 6 6 11 10 12-5 0-10-3-16-9Z"
-        fill="#f4ead8"
-      />
-      <path d="M32 18v32" stroke="#fbf6ec" strokeWidth="1.6" />
-    </svg>
+      <span className={`text-[10px] font-semibold uppercase tracking-[0.22em] ${label}`}>
+        Farms
+      </span>
+    </span>
   );
 }
 

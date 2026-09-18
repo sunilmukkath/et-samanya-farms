@@ -72,22 +72,28 @@ export default function FarmPage() {
       </section>
 
       <div className="mx-auto grid max-w-6xl gap-3 px-5 pb-4 sm:px-8 md:grid-cols-2">
-        <div className="overflow-hidden rounded-[1.75rem]">
+        <figure className="overflow-hidden rounded-[1.75rem] bg-cream">
           <FarmPhoto
-            src="/photos/seedlings.jpg"
-            alt="Young plants coming up in dark soil"
+            src="/photos/tending-vines.jpg"
+            alt="Tending gourd vines on the farm"
             className="h-56 w-full"
             sizes="(min-width: 768px) 50vw, 100vw"
+            width={768}
+            height={1024}
           />
-        </div>
-        <div className="overflow-hidden rounded-[1.75rem]">
+          <figcaption className="px-4 py-3 text-sm text-ink-soft">In the beds</figcaption>
+        </figure>
+        <figure className="overflow-hidden rounded-[1.75rem] bg-cream">
           <FarmPhoto
-            src="/photos/orchard.jpg"
-            alt="Trees spaced across open ground"
+            src="/photos/marigolds.jpg"
+            alt="Marigolds in the horticulture patch"
             className="h-56 w-full"
             sizes="(min-width: 768px) 50vw, 100vw"
+            width={1024}
+            height={1024}
           />
-        </div>
+          <figcaption className="px-4 py-3 text-sm text-ink-soft">Horticulture patch</figcaption>
+        </figure>
       </div>
 
       <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
@@ -105,7 +111,18 @@ export default function FarmPage() {
       </section>
 
       <section className="bg-leaf-deep text-cream">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 md:max-w-3xl">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 sm:px-8 md:grid-cols-2">
+          <div className="overflow-hidden rounded-[1.75rem]">
+            <FarmPhoto
+              src="/photos/pond.jpg"
+              alt="The donut pond at sundown"
+              className="h-72 w-full md:h-[22rem]"
+              sizes="(min-width: 768px) 50vw, 100vw"
+              width={1024}
+              height={768}
+            />
+          </div>
+          <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sun">Water</p>
           <h2 className="mt-3 font-display text-4xl tracking-tight">Our Sensei pond</h2>
           <p className="mt-5 text-base leading-relaxed text-cream/85">
@@ -119,6 +136,7 @@ export default function FarmPage() {
             full there are boats, visiting animals, a few fish, and — from
             December to February — a dip if you are brave about it.
           </p>
+          </div>
         </div>
       </section>
 

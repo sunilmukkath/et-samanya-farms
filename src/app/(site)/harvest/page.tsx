@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FarmPhoto } from "@/components/FarmPhoto";
-import { harvest } from "@/lib/site";
+import { gallery, harvest } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Harvest",
@@ -32,14 +32,14 @@ export default function HarvestPage() {
             key={crop.slug}
             className="overflow-hidden rounded-[1.75rem] border border-line bg-paper"
           >
-            <FarmPhoto
-              src={crop.photo}
-              alt={crop.photoAlt}
-              className="h-52 w-full"
-              sizes="(min-width: 768px) 45vw, 100vw"
-              width={crop.slug === "sesame" ? 460 : 1024}
-              height={crop.slug === "sesame" ? 1024 : 420}
-            />
+            {"photo" in crop && crop.photo ? (
+              <FarmPhoto
+                src={crop.photo}
+                alt={crop.photoAlt}
+                className="h-52 w-full"
+                sizes="(min-width: 768px) 45vw, 100vw"
+              />
+            ) : null}
             <div className="p-6 sm:p-8">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
                 {String(index + 1).padStart(2, "0")} · {crop.season}
@@ -54,6 +54,28 @@ export default function HarvestPage() {
 
       <section className="border-t border-line bg-cream">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">On the land</p>
+          <h2 className="mt-2 font-display text-4xl tracking-tight">From this season</h2>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {gallery.map((shot) => (
+              <figure key={shot.src} className="overflow-hidden rounded-[1.5rem] bg-paper">
+                <FarmPhoto
+                  src={shot.src}
+                  alt={shot.alt}
+                  className="h-48 w-full"
+                  sizes="(min-width: 1024px) 30vw, 90vw"
+                  width={1024}
+                  height={768}
+                />
+                <figcaption className="px-4 py-3 text-sm text-ink-soft">{shot.caption}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-line bg-paper">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
           <h2 className="font-display text-4xl tracking-tight">From farm to table</h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-soft">
             Fresh fruit and vegetables, and in time animal products and
@@ -62,7 +84,7 @@ export default function HarvestPage() {
           </p>
           <Link
             href="/visit"
-            className="mt-8 inline-flex h-12 items-center rounded-full bg-leaf px-6 font-semibold text-cream"
+            className="mt-8 inline-flex h-12 items-center rounded-full bg-leaf-deep px-6 font-semibold text-cream"
           >
             Ask for this week&apos;s list
           </Link>

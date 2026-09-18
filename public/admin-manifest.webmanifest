@@ -1,0 +1,14 @@
+{
+  "name": "Samanya farm log",
+  "short_name": "Farm log",
+  "description": "Field notes, weather, and tree census for ET Samanya Farms.",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#142414",
+  "theme_color": "#142414",
+  "icons": [
+    { "src": "/brand/mark.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/mark.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

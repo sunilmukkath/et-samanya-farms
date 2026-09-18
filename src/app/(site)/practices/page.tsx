@@ -47,11 +47,11 @@ export default function PracticesPage() {
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-8 md:grid-cols-[0.85fr_1.15fr] md:items-start">
           <div className="overflow-hidden rounded-[1.75rem]">
             <FarmPhoto
-              src="/photos/cholam.jpg"
-              alt="Grain in flower with a solar panel on the farm"
-              className="h-[28rem] w-full"
-              width={460}
-              height={1024}
+              src="/photos/solar.jpg"
+              alt="Solar panels standing on the farm"
+              className="h-[22rem] w-full"
+              width={1024}
+              height={768}
               sizes="(min-width: 768px) 35vw, 100vw"
             />
           </div>
@@ -72,6 +72,16 @@ export default function PracticesPage() {
               twenty-five metre radius.
             </p>
           </section>
+          <div className="overflow-hidden rounded-[1.25rem]">
+            <FarmPhoto
+              src="/photos/compost.jpg"
+              alt="Compost heaped on a sheet in the field"
+              className="h-40 w-full"
+              width={1024}
+              height={460}
+              sizes="(min-width: 768px) 35vw, 100vw"
+            />
+          </div>
           <Link href="/visit" className="inline-flex font-semibold text-leaf underline-draw">
             Visit the fields or call us →
           </Link>

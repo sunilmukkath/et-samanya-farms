@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Figtree, Noto_Sans_Tamil } from "next/font/google";
-import { SiteFooter } from "@/components/SiteFooter";
-import { SiteHeader } from "@/components/SiteHeader";
 import { site } from "@/lib/site";
 import "./globals.css";
 
@@ -45,7 +43,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#173022",
+  themeColor: "#142414",
 };
 
 export default function RootLayout({
@@ -53,45 +51,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Farm",
-    name: site.name,
-    legalName: site.legalName,
-    description: site.description,
-    email: site.email,
-    telephone: site.phoneDisplay,
-    foundingDate: String(site.founded),
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: site.location.street,
-      addressLocality: site.location.village,
-      addressRegion: site.location.state,
-      postalCode: site.location.pincode,
-      addressCountry: "IN",
-    },
-    geo: {
-      "@type": "GeoCoordinates",
-      latitude: site.location.lat,
-      longitude: site.location.lng,
-    },
-    hasMap: site.location.mapsUrl,
-  };
-
   return (
     <html
       lang="en-IN"
       className={`${display.variable} ${body.variable} ${tamil.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-paper text-ink">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
-      </body>
+      <body className="flex min-h-full flex-col bg-paper text-ink">{children}</body>
     </html>
   );
 }
