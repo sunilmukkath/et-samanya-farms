@@ -1,11 +1,12 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { seedSpecies, zoneLabels } from "@/lib/farm";
 import * as schema from "@/db/schema";
 
 type Database = ReturnType<typeof drizzle<typeof schema>>;
 
 const globalForDb = globalThis as unknown as {
+  farmSql?: ReturnType<typeof postgres>;
   farmDb?: Database;
   farmDbReady?: boolean;
 };
@@ -14,12 +15,27 @@ export function isDatabaseConfigured() {
   return Boolean(process.env.DATABASE_URL);
 }
 
-export function getDb() {
+function getSql() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set");
   }
+  if (!globalForDb.farmSql) {
+    const url = process.env.DATABASE_URL;
+    const local = url.includes("localhost") || url.includes("127.0.0.1");
+    globalForDb.farmSql = postgres(url, {
+      max: 1,
+      prepare: false,
+      idle_timeout: 20,
+      connect_timeout: 10,
+      ssl: local ? false : "require",
+    });
+  }
+  return globalForDb.farmSql;
+}
+
+export function getDb() {
   if (!globalForDb.farmDb) {
-    globalForDb.farmDb = drizzle(neon(process.env.DATABASE_URL), { schema });
+    globalForDb.farmDb = drizzle(getSql(), { schema });
   }
   return globalForDb.farmDb;
 }
@@ -27,7 +43,7 @@ export function getDb() {
 export async function ensureSchema() {
   if (!process.env.DATABASE_URL) return;
   if (globalForDb.farmDbReady) return;
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = getSql();
 
   await sql`CREATE TABLE IF NOT EXISTS species_catalog (
     id text PRIMARY KEY,
