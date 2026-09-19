@@ -1,8 +1,12 @@
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { getFarmProfile } from "@/lib/profile";
 import { site } from "@/lib/site";
+import { redirect } from "next/navigation";
 
-export default function SiteLayout({ children }: { children: React.ReactNode }) {
+export default async function SiteLayout({ children }: { children: React.ReactNode }) {
+  const profile = await getFarmProfile();
+  if (!profile.publicSite) redirect("/admin");
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Farm",

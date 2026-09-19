@@ -21,9 +21,9 @@ export default async function HarvestPage() {
   return (
     <article>
       <header className="texture grain border-b border-line">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">Harvest</p>
-          <h1 className="mt-3 max-w-3xl font-display text-5xl tracking-tight sm:text-6xl">
+          <h1 className="mt-3 max-w-3xl font-display text-4xl tracking-tight sm:text-6xl">
             Fresh food from the same plot as the trees.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">
@@ -84,7 +84,7 @@ export default async function HarvestPage() {
       </div>
 
       <section className="border-t border-line bg-cream">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">On the land</p>
           <h2 className="mt-2 font-display text-4xl tracking-tight">From this season</h2>
           <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -106,7 +106,7 @@ export default async function HarvestPage() {
       </section>
 
       <section className="border-t border-line bg-paper">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
           <h2 className="font-display text-4xl tracking-tight">From farm to table</h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-soft">
             Fresh fruit and vegetables, and in time animal products and

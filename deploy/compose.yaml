@@ -1,0 +1,39 @@
+# Farm OS mesh stack
+#
+# Run beside the Next.js app (Vercel or `next dev`).
+# The app URL is FARM_OS_URL. Nodes publish telemetry to Mosquitto;
+# the edge agent forwards to POST /api/farm/mqtt.
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.17.2-pg16
+    environment:
+      POSTGRES_USER: farm
+      POSTGRES_PASSWORD: farm
+      POSTGRES_DB: farm
+    ports:
+      - "5432:5432"
+    volumes:
+      - farm-pg:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+  edge-agent:
+    build: ./edge-agent
+    environment:
+      MQTT_URL: mqtt://mosquitto:1883
+      FARM_OS_URL: ${FARM_OS_URL:-http://host.docker.internal:3000}
+      FARM_EDGE_TOKEN: ${FARM_EDGE_TOKEN:-}
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+volumes:
+  farm-pg:

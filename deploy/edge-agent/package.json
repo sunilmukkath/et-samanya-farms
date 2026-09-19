@@ -1,0 +1,11 @@
+{
+  "name": "farm-os-edge-agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.10.4"
+  }
+}

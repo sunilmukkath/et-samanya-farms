@@ -1,5 +1,8 @@
 import { insertTask, listObservations, listTasks, listTrees } from "@/db/queries";
 import type { ObservationDomain, TaskRow } from "@/db/schema";
+import { evaluateFarmRules } from "@/lib/iot/rules";
+import { phiHolds, phiLabel } from "@/lib/phi";
+import { getRuntimeFarm } from "@/lib/profile";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -9,6 +12,8 @@ function daysAgo(date: Date | string | null | undefined) {
 }
 
 export async function deriveFarmTasks(): Promise<TaskRow[]> {
+  const runtime = await getRuntimeFarm();
+  const modules = new Set(runtime.modules);
   const [trees, observations, existing] = await Promise.all([
     listTrees(),
     listObservations({ limit: 200 }),
@@ -29,29 +34,38 @@ export async function deriveFarmTasks(): Promise<TaskRow[]> {
 
   const wanted: { title: string; domain: ObservationDomain | null; treeId: string | null }[] = [];
 
-  for (const tree of trees) {
-    if (tree.health !== "watch" && tree.health !== "stressed") continue;
-    const last = observations.find((row) => row.treeId === tree.id);
-    if (daysAgo(last?.occurredAt ?? tree.updatedAt) >= 3) {
-      wanted.push({
-        title: `Recheck ${tree.species} (${tree.health})`,
-        domain: "plant_health",
-        treeId: tree.id,
-      });
+  if (modules.has("trees")) {
+    for (const tree of trees) {
+      if (tree.health !== "watch" && tree.health !== "stressed") continue;
+      const last = observations.find((row) => row.treeId === tree.id);
+      if (daysAgo(last?.occurredAt ?? tree.updatedAt) >= 3) {
+        wanted.push({
+          title: `Recheck ${tree.species} (${tree.health})`,
+          domain: "plant_health",
+          treeId: tree.id,
+        });
+      }
     }
   }
 
-  if (daysAgo(lastByDomain.rain) >= 7) {
+  if (runtime.domains.some((d) => d.slug === "rain") && daysAgo(lastByDomain.rain) >= 7) {
     wanted.push({ title: "Log rain and pond level", domain: "rain", treeId: null });
   }
-  if (daysAgo(lastSoilAction?.occurredAt ?? lastByDomain.soil) >= 9) {
+  if (runtime.domains.some((d) => d.slug === "soil") && daysAgo(lastSoilAction?.occurredAt ?? lastByDomain.soil) >= 9) {
     wanted.push({ title: "Turn compost / note the heap", domain: "soil", treeId: null });
   }
-  if (lastRain && daysAgo(lastRain.occurredAt) <= 2 && daysAgo(lastKit?.occurredAt) >= 2) {
+  if (runtime.domains.some((d) => d.slug === "kit") && lastRain && daysAgo(lastRain.occurredAt) <= 2 && daysAgo(lastKit?.occurredAt) >= 2) {
     wanted.push({ title: "Inspect drip after rain", domain: "kit", treeId: null });
   }
-  if (daysAgo(lastHarvest?.occurredAt) >= 6) {
+  if (runtime.domains.some((d) => d.slug === "harvest") && daysAgo(lastHarvest?.occurredAt) >= 6) {
     wanted.push({ title: "Walk harvest beds", domain: "harvest", treeId: null });
+  }
+  for (const hold of phiHolds(observations)) {
+    wanted.push({
+      title: `${hold.crop}: ${phiLabel(hold.until)}${hold.product ? ` after ${hold.product}` : ""}`,
+      domain: "harvest",
+      treeId: null,
+    });
   }
 
   const openTitles = new Set(
@@ -76,5 +90,7 @@ export async function deriveFarmTasks(): Promise<TaskRow[]> {
       }),
     );
   }
+
+  await evaluateFarmRules().catch(() => undefined);
   return created;
 }

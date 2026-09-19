@@ -1,18 +1,25 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
+  AlertRow,
   AnimalRow,
   BriefRow,
+  DeviceRow,
+  FarmProfileRow,
+  FirmwareRow,
   GeoPolygon,
   LedgerRow,
   ObservationRow,
+  PlantStandRow,
   PlotRow,
+  ReadingRow,
   SpeciesRow,
   TaskRow,
   TreeRow,
   ZoneRow,
 } from "@/db/schema";
-import { seedPlots, seedSpecies, zoneLabels } from "@/lib/farm";
+import type { FarmProfile } from "@/lib/packs/types";
+import { samanyaProfile } from "@/lib/profiles/samanya";
 
 type FarmFile = {
   species: SpeciesRow[];
@@ -24,6 +31,12 @@ type FarmFile = {
   tasks: TaskRow[];
   briefs: BriefRow[];
   ledger: LedgerRow[];
+  profile: FarmProfileRow | null;
+  plantStands: PlantStandRow[];
+  devices: DeviceRow[];
+  readings: ReadingRow[];
+  alerts: AlertRow[];
+  firmware: FirmwareRow[];
 };
 
 const filePath = path.join(process.cwd(), ".data", "farm.json");
@@ -52,6 +65,7 @@ function revive(data: Partial<FarmFile>): FarmFile {
       ...row,
       plotId: row.plotId ?? null,
       animalId: row.animalId ?? null,
+      plantStandId: row.plantStandId ?? null,
       source: row.source ?? null,
       createdBy: row.createdBy ?? null,
       occurredAt: new Date(row.occurredAt),
@@ -81,13 +95,40 @@ function revive(data: Partial<FarmFile>): FarmFile {
       occurredAt: new Date(row.occurredAt),
       createdAt: new Date(row.createdAt),
     })),
+    profile: data.profile
+      ? { ...data.profile, updatedAt: new Date(data.profile.updatedAt) }
+      : base.profile,
+    plantStands: (data.plantStands ?? []).map((row) => ({
+      ...row,
+      plantedOn: asDate(row.plantedOn),
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+    })),
+    devices: (data.devices ?? []).map((row) => ({
+      ...row,
+      lastSeenAt: asDate(row.lastSeenAt),
+      createdAt: new Date(row.createdAt),
+    })),
+    readings: (data.readings ?? []).map((row) => ({
+      ...row,
+      recordedAt: new Date(row.recordedAt),
+    })),
+    alerts: (data.alerts ?? []).map((row) => ({
+      ...row,
+      acknowledgedAt: asDate(row.acknowledgedAt),
+      createdAt: new Date(row.createdAt),
+    })),
+    firmware: (data.firmware ?? []).map((row) => ({
+      ...row,
+      createdAt: new Date(row.createdAt),
+    })),
   };
 }
 
 function seed(): FarmFile {
   const now = new Date();
   return {
-    species: seedSpecies.map((row) => ({
+    species: samanyaProfile.seedSpecies.map((row) => ({
       id: crypto.randomUUID(),
       name: row.name,
       tamil: row.tamil,
@@ -95,7 +136,7 @@ function seed(): FarmFile {
       createdAt: now,
     })),
     zones: [
-      ...zoneLabels.map((name) => ({
+      ...samanyaProfile.zoneLabels.map((name) => ({
         id: crypto.randomUUID(),
         name,
         polygon: null,
@@ -105,7 +146,7 @@ function seed(): FarmFile {
     ],
     trees: [],
     observations: [],
-    plots: seedPlots.map((plot) => ({
+    plots: samanyaProfile.seedPlots.map((plot) => ({
       id: crypto.randomUUID(),
       name: plot.name,
       kind: plot.kind,
@@ -117,6 +158,16 @@ function seed(): FarmFile {
     tasks: [],
     briefs: [],
     ledger: [],
+    profile: {
+      id: "farm",
+      config: samanyaProfile as unknown as Record<string, unknown>,
+      updatedAt: now,
+    },
+    plantStands: [],
+    devices: [],
+    readings: [],
+    alerts: [],
+    firmware: [],
   };
 }
 
@@ -226,6 +277,7 @@ export const fileStore = {
     treeId?: string;
     plotId?: string;
     animalId?: string;
+    plantStandId?: string;
     query?: string;
     since?: Date;
     limit?: number;
@@ -235,6 +287,7 @@ export const fileStore = {
     if (opts.treeId) rows = rows.filter((row) => row.treeId === opts.treeId);
     if (opts.plotId) rows = rows.filter((row) => row.plotId === opts.plotId);
     if (opts.animalId) rows = rows.filter((row) => row.animalId === opts.animalId);
+    if (opts.plantStandId) rows = rows.filter((row) => row.plantStandId === opts.plantStandId);
     if (opts.domain) rows = rows.filter((row) => row.domain === opts.domain);
     if (opts.since) rows = rows.filter((row) => row.occurredAt >= opts.since!);
     if (opts.query) {
@@ -361,6 +414,115 @@ export const fileStore = {
   insertLedger(row: LedgerRow) {
     return mutate((data) => {
       data.ledger.unshift(row);
+      return row;
+    });
+  },
+  async getFarmProfileRecord(): Promise<FarmProfile | null> {
+    const data = await read();
+    return (data.profile?.config as FarmProfile | undefined) ?? null;
+  },
+  saveFarmProfileRecord(profile: FarmProfile) {
+    return mutate((data) => {
+      data.profile = { id: "farm", config: profile as unknown as Record<string, unknown>, updatedAt: new Date() };
+      return profile;
+    });
+  },
+  async listPlantStands() {
+    const data = await read();
+    return [...data.plantStands].sort((a, b) => a.name.localeCompare(b.name));
+  },
+  insertPlantStand(row: PlantStandRow) {
+    return mutate((data) => {
+      data.plantStands.push(row);
+      return row;
+    });
+  },
+  updatePlantStand(id: string, patch: Partial<PlantStandRow>) {
+    return mutate((data) => {
+      const row = data.plantStands.find((stand) => stand.id === id);
+      if (!row) return;
+      Object.assign(row, patch);
+    });
+  },
+  async listDevices() {
+    const data = await read();
+    return [...data.devices].sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async getDevice(id: string) {
+    const data = await read();
+    return data.devices.find((row) => row.id === id) ?? null;
+  },
+  async getDeviceByTokenHash(tokenHash: string) {
+    const data = await read();
+    return data.devices.find((row) => row.tokenHash === tokenHash) ?? null;
+  },
+  insertDevice(row: DeviceRow) {
+    return mutate((data) => {
+      data.devices.push(row);
+      return row;
+    });
+  },
+  updateDevice(id: string, patch: Partial<DeviceRow>) {
+    return mutate((data) => {
+      const row = data.devices.find((device) => device.id === id);
+      if (!row) return;
+      Object.assign(row, patch);
+    });
+  },
+  insertReading(row: ReadingRow) {
+    return mutate((data) => {
+      data.readings.push(row);
+      return row;
+    });
+  },
+  async listReadings(opts: { deviceId?: string; metric?: string; since?: Date; limit?: number } = {}) {
+    const data = await read();
+    let rows = data.readings;
+    if (opts.deviceId) rows = rows.filter((row) => row.deviceId === opts.deviceId);
+    if (opts.metric) rows = rows.filter((row) => row.metric === opts.metric);
+    if (opts.since) rows = rows.filter((row) => row.recordedAt >= opts.since!);
+    return [...rows]
+      .sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime())
+      .slice(0, opts.limit ?? 200);
+  },
+  async latestReadings() {
+    const data = await read();
+    const map = new Map<string, ReadingRow>();
+    for (const row of [...data.readings].sort((a, b) => a.recordedAt.getTime() - b.recordedAt.getTime())) {
+      map.set(`${row.deviceId}:${row.metric}`, row);
+    }
+    return [...map.values()];
+  },
+  async listAlerts(includeAck = false) {
+    const data = await read();
+    return data.alerts
+      .filter((row) => includeAck || !row.acknowledgedAt)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  },
+  insertAlert(row: AlertRow) {
+    return mutate((data) => {
+      const exists = data.alerts.some(
+        (alert) => !alert.acknowledgedAt && alert.title === row.title && alert.deviceId === row.deviceId,
+      );
+      if (exists) return row;
+      data.alerts.unshift(row);
+      return row;
+    });
+  },
+  acknowledgeAlert(id: string) {
+    return mutate((data) => {
+      const row = data.alerts.find((alert) => alert.id === id);
+      if (!row) return;
+      row.acknowledgedAt = new Date();
+    });
+  },
+  async listFirmware() {
+    const data = await read();
+    return [...data.firmware].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  },
+  insertFirmware(row: FirmwareRow) {
+    return mutate((data) => {
+      data.firmware.unshift(row);
       return row;
     });
   },

@@ -12,9 +12,9 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
-        <Link href="/" onClick={() => setOpen(false)}>
-          <BrandLockup variant="ink" />
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-8 sm:py-4">
+        <Link href="/" onClick={() => setOpen(false)} className="min-w-0">
+          <BrandLockup variant="ink" className="h-10 sm:h-12" />
         </Link>
 
         <nav className="hidden items-center gap-7 text-sm font-medium text-ink-soft md:flex">
@@ -41,7 +41,7 @@ export function SiteHeader() {
 
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line md:hidden"
+          className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-line md:hidden"
           aria-expanded={open}
           aria-label={open ? "Close menu" : "Open menu"}
           onClick={() => setOpen((v) => !v)}
@@ -56,18 +56,25 @@ export function SiteHeader() {
       </div>
 
       {open ? (
-        <div className="border-t border-line bg-paper px-5 py-4 md:hidden">
-          <nav className="flex flex-col gap-3 text-base">
+        <div className="border-t border-line bg-paper px-5 py-3 md:hidden">
+          <nav className="flex flex-col">
             {site.nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="py-1 text-ink"
+                className="flex min-h-12 items-center text-base text-ink"
                 onClick={() => setOpen(false)}
               >
                 {item.label}
               </Link>
             ))}
+            <Link
+              href="/visit"
+              className="tap mt-2 flex items-center justify-center rounded-full bg-leaf-deep text-sm font-semibold text-cream"
+              onClick={() => setOpen(false)}
+            >
+              Enquire
+            </Link>
           </nav>
         </div>
       ) : null}

@@ -112,8 +112,27 @@ body {
   animation: rise 0.9s ease 0.12s both;
 }
 
+a,
+button,
+.tap,
+.admin-chip,
+.admin-tab {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(20, 36, 20, 0.12);
+}
+
 .tap {
   min-height: 48px;
+}
+
+.admin-app {
+  overscroll-behavior: none;
+}
+
+.admin-app input,
+.admin-app select,
+.admin-app textarea {
+  font-size: 1rem;
 }
 
 .admin-chip {
@@ -135,6 +154,7 @@ body {
 
 .admin-tab {
   display: flex;
+  min-height: 52px;
   align-items: center;
   justify-content: center;
   color: var(--sand);
@@ -148,7 +168,7 @@ body {
 .admin-camera {
   position: relative;
   display: flex;
-  min-height: 11rem;
+  min-height: 8.5rem;
   width: 100%;
   cursor: pointer;
   align-items: center;
@@ -157,6 +177,12 @@ body {
   border-radius: 1.75rem;
   border: 2px dashed var(--line);
   background: var(--cream);
+}
+
+@media (min-height: 740px) {
+  .admin-camera {
+    min-height: 11rem;
+  }
 }
 
 .admin-camera img {
@@ -168,5 +194,24 @@ body {
 }
 
 .admin-fade-x {
+  -webkit-overflow-scrolling: touch;
   mask-image: linear-gradient(90deg, #000 88%, transparent);
+}
+
+@media print {
+  .admin-no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  .brief-print {
+    border: none;
+    box-shadow: none;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
 }

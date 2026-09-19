@@ -13,10 +13,10 @@ export default function FarmPage() {
   return (
     <article>
       <header className="texture grain border-b border-line">
-        <div className="mx-auto grid max-w-6xl items-end gap-8 px-5 py-16 sm:px-8 md:grid-cols-[1.2fr_0.8fr]">
+        <div className="mx-auto grid max-w-6xl items-end gap-8 px-5 py-12 sm:px-8 md:grid-cols-[1.2fr_0.8fr] md:py-16">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">The farm</p>
-            <h1 className="mt-3 font-display text-5xl tracking-tight sm:text-6xl">
+            <h1 className="mt-3 font-display text-4xl tracking-tight sm:text-6xl">
               Five acres, landscaped to get more out of the land.
             </h1>
           </div>
@@ -27,7 +27,7 @@ export default function FarmPage() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-12 px-5 py-16 sm:px-8 md:grid-cols-[0.9fr_1.1fr]">
+      <div className="mx-auto grid max-w-6xl gap-12 px-5 py-12 sm:px-8 sm:py-16 md:grid-cols-[0.9fr_1.1fr]">
         <div className="overflow-hidden rounded-[2rem]">
           <FarmPhoto
             src="/photos/canopy.jpg"
@@ -57,7 +57,7 @@ export default function FarmPage() {
       </div>
 
       <section className="border-y border-line bg-cream">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">The plot</p>
           <h2 className="mt-2 font-display text-4xl tracking-tight">How the acres are used</h2>
           <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -96,7 +96,7 @@ export default function FarmPage() {
         </figure>
       </div>
 
-      <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+      <section className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">Journey</p>
         <h2 className="mt-2 font-display text-4xl tracking-tight">From purchase to a living farm</h2>
         <ol className="mt-10 grid gap-6 md:grid-cols-5">
@@ -111,7 +111,7 @@ export default function FarmPage() {
       </section>
 
       <section className="bg-leaf-deep text-cream">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 sm:px-8 md:grid-cols-2">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-12 sm:px-8 sm:py-16 md:grid-cols-2">
           <div className="overflow-hidden rounded-[1.75rem]">
             <FarmPhoto
               src="/photos/pond.jpg"
@@ -141,7 +141,7 @@ export default function FarmPage() {
       </section>
 
       <section className="border-t border-line bg-cream">
-        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-16 sm:px-8 md:grid-cols-2">
+        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-12 sm:px-8 sm:py-16 md:grid-cols-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Where</p>
             <p className="mt-2 font-display text-2xl">{site.location.address}</p>

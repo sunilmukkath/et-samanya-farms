@@ -44,7 +44,7 @@ export function EnquireForm() {
           required
           name="name"
           autoComplete="name"
-          className="h-11 rounded-xl border border-line bg-paper px-3 outline-none ring-leaf focus:ring-2"
+          className="tap w-full rounded-xl border border-line bg-paper px-3 text-base outline-none ring-leaf focus:ring-2"
         />
       </label>
       <label className="grid gap-1 text-sm">
@@ -54,14 +54,14 @@ export function EnquireForm() {
           type="email"
           name="email"
           autoComplete="email"
-          className="h-11 rounded-xl border border-line bg-paper px-3 outline-none ring-leaf focus:ring-2"
+          className="tap w-full rounded-xl border border-line bg-paper px-3 text-base outline-none ring-leaf focus:ring-2"
         />
       </label>
       <label className="grid gap-1 text-sm">
         <span className="font-medium">I am looking for</span>
         <select
           name="interest"
-          className="h-11 rounded-xl border border-line bg-paper px-3 outline-none ring-leaf focus:ring-2"
+          className="tap w-full rounded-xl border border-line bg-paper px-3 text-base outline-none ring-leaf focus:ring-2"
           defaultValue="produce"
         >
           {enquireInterests.map((item) => (
@@ -77,13 +77,13 @@ export function EnquireForm() {
           required
           name="message"
           rows={5}
-          className="rounded-xl border border-line bg-paper px-3 py-2 outline-none ring-leaf focus:ring-2"
+          className="w-full rounded-xl border border-line bg-paper px-3 py-3 text-base outline-none ring-leaf focus:ring-2"
           placeholder="Quantities, dates, or when you would like to visit."
         />
       </label>
       <button
         type="submit"
-        className="mt-2 inline-flex h-12 items-center justify-center rounded-full bg-clay px-6 font-semibold text-paper hover:bg-clay-deep"
+        className="tap mt-2 inline-flex w-full items-center justify-center rounded-full bg-clay px-6 font-semibold text-paper hover:bg-clay-deep sm:w-auto"
       >
         Send enquiry
       </button>

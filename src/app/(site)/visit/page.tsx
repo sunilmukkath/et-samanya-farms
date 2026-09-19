@@ -16,9 +16,9 @@ export default function VisitPage() {
   return (
     <article>
       <header className="texture grain border-b border-line">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">Visit & enquire</p>
-          <h1 className="mt-3 max-w-3xl font-display text-5xl tracking-tight sm:text-6xl">
+          <h1 className="mt-3 max-w-3xl font-display text-4xl tracking-tight sm:text-6xl">
             Interested in growing your food?
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">
@@ -29,7 +29,7 @@ export default function VisitPage() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-12 px-5 py-16 sm:px-8 lg:grid-cols-2">
+      <div className="mx-auto grid max-w-6xl gap-12 px-5 py-12 sm:px-8 lg:grid-cols-2 lg:py-16">
         <div>
           <div className="mb-8 overflow-hidden rounded-[1.75rem]">
             <FarmPhoto
@@ -61,13 +61,13 @@ export default function VisitPage() {
             </p>
             <a
               href={site.phoneHref}
-              className="mt-4 inline-flex font-semibold text-leaf underline-draw"
+              className="tap mt-4 inline-flex items-center font-semibold text-leaf underline-draw"
             >
               {site.phoneDisplay}
             </a>
             <a
               href={mapsUrl}
-              className="mt-2 block text-sm font-semibold text-leaf underline-draw"
+              className="tap inline-flex items-center text-sm font-semibold text-leaf underline-draw"
               target="_blank"
               rel="noreferrer"
             >
@@ -85,7 +85,7 @@ export default function VisitPage() {
             />
             <a
               href={mapsUrl}
-              className="block bg-cream px-4 py-2 text-xs text-muted hover:text-leaf"
+              className="tap block bg-cream px-4 py-3 text-sm text-muted hover:text-leaf"
               target="_blank"
               rel="noreferrer"
             >

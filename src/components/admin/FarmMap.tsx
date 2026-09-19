@@ -4,9 +4,11 @@ import {
   createTreeAction,
   getTreeDetailAction,
   saveBoundaryAction,
+  savePlotPolygonAction,
   suggestTreeVisionAction,
 } from "@/app/admin/actions";
 import { GpsBadge, useGps } from "@/components/admin/GpsBadge";
+import { ShareNote } from "@/components/admin/ShareNote";
 import type { AiSuggestion, GeoPolygon, TreeHealth, ZoneRow } from "@/db/schema";
 import {
   DUPLICATE_TREE_METERS,
@@ -24,6 +26,16 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+
+export type DevicePin = {
+  id: string;
+  name: string;
+  kind: string;
+  lat: number;
+  lng: number;
+  status: string;
+  lastValue?: string;
+};
 
 export type TreePin = {
   id: string;
@@ -71,6 +83,11 @@ export function FarmMap({
   healthEvents = [],
   droneTileUrl = null,
   visionEnabled,
+  farmCenter = farmCoords,
+  censusTarget = treeCensusTarget,
+  zoneChoices = zoneLabels,
+  devices = [],
+  walkPlotId = null,
 }: {
   trees: TreePin[];
   species: { name: string; tamil: string | null }[];
@@ -79,6 +96,11 @@ export function FarmMap({
   healthEvents?: HealthEvent[];
   droneTileUrl?: string | null;
   visionEnabled: boolean;
+  farmCenter?: { lat: number; lng: number };
+  censusTarget?: number;
+  zoneChoices?: string[];
+  devices?: DevicePin[];
+  walkPlotId?: string | null;
 }) {
   const router = useRouter();
   const container = useRef<HTMLDivElement>(null);
@@ -95,10 +117,13 @@ export function FarmMap({
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getTreeDetailAction>>>(null);
   const [boundaryOn, setBoundaryOn] = useState(false);
   const [boundaryPts, setBoundaryPts] = useState<{ lat: number; lng: number }[]>([]);
+  const [plotWalkId, setPlotWalkId] = useState<string | null>(walkPlotId);
+  const [plotWalkPts, setPlotWalkPts] = useState<{ lat: number; lng: number }[]>([]);
   const [showPlots, setShowPlots] = useState(true);
   const [showHealth, setShowHealth] = useState(false);
   const [showDrone, setShowDrone] = useState(Boolean(droneTileUrl));
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [pending, start] = useTransition();
   const droneTiles = droneTileUrl;
 
@@ -134,12 +159,16 @@ export function FarmMap({
         },
         layers: [{ id: "sat", type: "raster", source: "sat" }],
       },
-      center: [farmCoords.lng, farmCoords.lat],
+      center: [
+        Number.isFinite(farmCenter.lng) ? farmCenter.lng : farmCoords.lng,
+        Number.isFinite(farmCenter.lat) ? farmCenter.lat : farmCoords.lat,
+      ],
       zoom: 17.2,
       maxZoom: 20,
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     map.on("load", () => {
+      setMapReady(true);
       map.addSource("trees", {
         type: "geojson",
         data: emptyFc(),
@@ -277,21 +306,23 @@ export function FarmMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.getSource("trees")) return;
+    if (!mapReady || !map?.getSource("trees")) return;
     const source = map.getSource("trees") as GeoJSONSource;
     source.setData({
       type: "FeatureCollection",
-      features: filtered.map((tree) => ({
-        type: "Feature",
-        geometry: { type: "Point", coordinates: [tree.lng, tree.lat] },
-        properties: { id: tree.id, health: tree.health, species: tree.species },
-      })),
+      features: filtered
+        .filter((tree) => Number.isFinite(tree.lat) && Number.isFinite(tree.lng))
+        .map((tree) => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [tree.lng, tree.lat] },
+          properties: { id: tree.id, health: tree.health, species: tree.species },
+        })),
     });
-  }, [filtered]);
+  }, [filtered, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.getSource("boundary")) return;
+    if (!mapReady || !map?.getSource("boundary")) return;
     const saved = zones.find((zone) => zone.name === "Farm boundary" && zone.polygon);
     const source = map.getSource("boundary") as GeoJSONSource;
     if (boundaryPts.length >= 2) {
@@ -316,31 +347,47 @@ export function FarmMap({
     } else {
       source.setData(emptyFc());
     }
-  }, [zones, boundaryPts]);
+  }, [zones, boundaryPts, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.getSource("plots")) return;
+    if (!mapReady || !map?.getSource("plots")) return;
     const source = map.getSource("plots") as GeoJSONSource;
     if (!showPlots) {
       source.setData(emptyFc());
       return;
     }
-    source.setData({
-      type: "FeatureCollection",
-      features: plots
-        .filter((plot) => plot.polygon)
-        .map((plot) => ({
-          type: "Feature" as const,
-          geometry: plot.polygon as GeoPolygon,
-          properties: { id: plot.id, name: plot.name, kind: plot.kind },
-        })),
-    });
-  }, [plots, showPlots]);
+    try {
+      source.setData({
+        type: "FeatureCollection",
+        features: [
+          ...plots.filter((plot) => usablePolygon(plot.polygon)).map((plot) => ({
+            type: "Feature" as const,
+            geometry: plot.polygon as GeoPolygon,
+            properties: { id: plot.id, name: plot.name, kind: plot.kind },
+          })),
+          ...(plotWalkId && plotWalkPts.length >= 2
+            ? [
+                {
+                  type: "Feature" as const,
+                  geometry: {
+                    type: "Polygon" as const,
+                    coordinates: [[...plotWalkPts, plotWalkPts[0]].map((p) => [p.lng, p.lat])],
+                  },
+                  properties: { id: plotWalkId, name: "draft", kind: "draft" },
+                },
+              ]
+            : []),
+        ],
+      });
+    } catch {
+      source.setData(emptyFc());
+    }
+  }, [plots, showPlots, plotWalkId, plotWalkPts, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.getSource("health")) return;
+    if (!mapReady || !map?.getSource("health")) return;
     const source = map.getSource("health") as GeoJSONSource;
     if (!showHealth) {
       source.setData(emptyFc());
@@ -354,17 +401,17 @@ export function FarmMap({
         properties: { id: event.id, label: event.label },
       })),
     });
-  }, [healthEvents, showHealth]);
+  }, [healthEvents, showHealth, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.getLayer("drone")) return;
+    if (!mapReady || !map?.getLayer("drone")) return;
     map.setLayoutProperty("drone", "visibility", showDrone ? "visible" : "none");
-  }, [showDrone]);
+  }, [showDrone, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !fix) return;
+    if (!mapReady || !map || !fix) return;
     if (!youRef.current) {
       const el = document.createElement("div");
       el.className = "h-3.5 w-3.5 rounded-full border-2 border-white bg-sky-400 shadow";
@@ -372,7 +419,26 @@ export function FarmMap({
     } else {
       youRef.current.setLngLat([fix.lng, fix.lat]);
     }
-  }, [fix]);
+  }, [fix, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map?.isStyleLoaded()) return;
+    const markers: Marker[] = [];
+    for (const device of devices) {
+      if (device.lat == null || device.lng == null) continue;
+      const el = document.createElement("div");
+      el.title = `${device.name} · ${device.kind}`;
+      el.className =
+        device.status === "online"
+          ? "h-3 w-3 rounded-full border-2 border-white bg-sun shadow"
+          : "h-3 w-3 rounded-full border-2 border-white bg-muted shadow";
+      markers.push(new Marker({ element: el }).setLngLat([device.lng, device.lat]).addTo(map));
+    }
+    return () => {
+      for (const marker of markers) marker.remove();
+    };
+  }, [devices, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -405,24 +471,44 @@ export function FarmMap({
   }, [selectedId]);
 
   useEffect(() => {
-    if (!boundaryOn || !fix) return;
+    if (walkPlotId) {
+      setPlotWalkId(walkPlotId);
+      setPlotWalkPts([]);
+      setBoundaryOn(false);
+      setBoundaryPts([]);
+      setShowPlots(true);
+      setFiltersOpen(false);
+    }
+  }, [walkPlotId]);
+
+  useEffect(() => {
+    if (!fix) return;
+    if (plotWalkId) {
+      setPlotWalkPts((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && haversineMeters(last, fix) < 8) return prev;
+        return [...prev, { lat: fix.lat, lng: fix.lng }];
+      });
+      return;
+    }
+    if (!boundaryOn) return;
     setBoundaryPts((prev) => {
       const last = prev[prev.length - 1];
       if (last && haversineMeters(last, fix) < 8) return prev;
       return [...prev, { lat: fix.lat, lng: fix.lng }];
     });
-  }, [boundaryOn, fix]);
+  }, [boundaryOn, plotWalkId, fix]);
 
   function startAdd() {
     const map = mapRef.current;
     const center = map?.getCenter();
     const gpsOnFarm =
-      fix && haversineMeters(fix, farmCoords) < 1500
+      fix && haversineMeters(fix, farmCenter) < 1500
         ? { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy }
         : null;
     const loc = gpsOnFarm ?? {
-      lat: center?.lat ?? farmCoords.lat,
-      lng: center?.lng ?? farmCoords.lng,
+      lat: center?.lat ?? farmCenter.lat,
+      lng: center?.lng ?? farmCenter.lng,
       accuracy: null,
     };
     setAdding(true);
@@ -432,17 +518,22 @@ export function FarmMap({
   }
 
   const speciesNames = useMemo(() => Array.from(new Set(trees.map((t) => t.species))).sort(), [trees]);
+  const walkingPlot = plots.find((plot) => plot.id === plotWalkId);
 
   return (
-    <div className="relative h-full min-h-[24rem] overflow-hidden bg-soil">
+    <div className="relative h-full min-h-0 flex-1 overflow-hidden bg-soil">
       <div ref={container} className="absolute inset-0" />
 
       <div className="absolute inset-x-0 top-0 z-10 p-3">
         <div className="rounded-[1.25rem] bg-paper/95 px-3 py-2 shadow">
           <div className="flex items-center gap-2">
             <p className="min-w-0 flex-1 text-sm font-semibold">
-              {trees.length} / {treeCensusTarget}
-              {watchCount ? <span className="ml-2 text-clay">{watchCount} on watch</span> : null}
+              {walkingPlot
+                ? `Walk ${walkingPlot.name}`
+                : censusTarget
+                  ? `${trees.length} / ${censusTarget}`
+                  : `${trees.length} trees`}
+              {!walkingPlot && watchCount ? <span className="ml-2 text-clay">{watchCount} on watch</span> : null}
             </p>
             <span className="shrink-0 rounded-full bg-cream px-2 py-1">
               <GpsBadge fix={fix} error={error} />
@@ -457,8 +548,8 @@ export function FarmMap({
             </button>
           </div>
           {filtersOpen ? (
-            <div className="mt-3 space-y-2 border-t border-line pt-3">
-              <div className="flex gap-2 overflow-x-auto">
+            <div className="mt-3 max-h-[38dvh] space-y-2 overflow-y-auto border-t border-line pt-3">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 <Chip on={healthFilter === "all"} onClick={() => setHealthFilter("all")}>
                   All
                 </Chip>
@@ -468,7 +559,7 @@ export function FarmMap({
                   </Chip>
                 ))}
               </div>
-              <div className="flex gap-2 overflow-x-auto">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 <Chip on={speciesFilter === "all"} onClick={() => setSpeciesFilter("all")}>
                   Every species
                 </Chip>
@@ -478,7 +569,7 @@ export function FarmMap({
                   </Chip>
                 ))}
               </div>
-              <div className="flex gap-2 overflow-x-auto">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 <Chip on={yearFilter === "all"} onClick={() => setYearFilter("all")}>
                   Any year
                 </Chip>
@@ -488,7 +579,7 @@ export function FarmMap({
                   </Chip>
                 ))}
               </div>
-              <div className="flex gap-2 overflow-x-auto">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 <Chip on={showPlots} onClick={() => setShowPlots((value) => !value)}>
                   Plots
                 </Chip>
@@ -512,6 +603,18 @@ export function FarmMap({
                 >
                   Cancel boundary walk
                 </button>
+              ) : plotWalkId ? (
+                <button
+                  type="button"
+                  className="text-sm font-semibold text-leaf-deep"
+                  onClick={() => {
+                    setPlotWalkId(null);
+                    setPlotWalkPts([]);
+                    router.replace("/admin/map");
+                  }}
+                >
+                  Cancel plot walk
+                </button>
               ) : (
                 <button
                   type="button"
@@ -530,8 +633,27 @@ export function FarmMap({
         </div>
       </div>
 
-      <div className="absolute bottom-4 right-3 z-10">
-        {boundaryOn ? (
+      <div className="absolute bottom-3 right-3 z-10">
+        {plotWalkId ? (
+          <button
+            type="button"
+            className="tap rounded-full bg-cream px-5 text-base font-semibold text-leaf-deep shadow-lg"
+            onClick={() => {
+              start(async () => {
+                const result = await savePlotPolygonAction(plotWalkId, plotWalkPts);
+                if (result && "ok" in result && result.ok) {
+                  setPlotWalkId(null);
+                  setPlotWalkPts([]);
+                  router.replace("/admin/map");
+                  router.refresh();
+                }
+              });
+            }}
+            disabled={pending || plotWalkPts.length < 3}
+          >
+            Save outline ({plotWalkPts.length})
+          </button>
+        ) : boundaryOn ? (
           <button
             type="button"
             className="tap rounded-full bg-cream px-5 text-base font-semibold text-leaf-deep shadow-lg"
@@ -565,6 +687,7 @@ export function FarmMap({
           species={species}
           trees={trees}
           visionEnabled={visionEnabled}
+          zoneChoices={zoneChoices}
           onClose={() => {
             setAdding(false);
             setDraft(null);
@@ -599,7 +722,7 @@ export function FarmMap({
                 <p className="text-xs text-muted">Pinned ±{Math.round(detail.tree.accuracyM)} m</p>
               ) : null}
             </div>
-            <button type="button" className="text-sm text-muted" onClick={() => setSelectedId(null)}>
+            <button type="button" className="tap shrink-0 px-2 text-sm text-muted" onClick={() => setSelectedId(null)}>
               Close
             </button>
           </div>
@@ -617,6 +740,13 @@ export function FarmMap({
             >
               Health note
             </Link>
+          </div>
+          <div className="mt-2">
+            <ShareNote
+              title={`${detail.tree.species} · ET Samanya`}
+              text={`${detail.tree.species} · ${detail.tree.health}${detail.tree.note ? ` · ${detail.tree.note}` : ""}`}
+              photoUrl={detail.tree.photoUrl}
+            />
           </div>
           <ul className="mt-4 space-y-2 text-sm">
             {detail.notes.map((note) => (
@@ -637,6 +767,7 @@ function TreeCapture({
   species,
   trees,
   visionEnabled,
+  zoneChoices,
   onClose,
   onSaved,
 }: {
@@ -644,6 +775,7 @@ function TreeCapture({
   species: { name: string; tamil: string | null }[];
   trees: TreePin[];
   visionEnabled: boolean;
+  zoneChoices: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -660,7 +792,7 @@ function TreeCapture({
 
   return (
     <form
-      className="absolute inset-x-0 bottom-0 z-30 max-h-[78%] overflow-y-auto rounded-t-[1.75rem] bg-paper p-5 shadow-2xl"
+      className="absolute inset-x-0 bottom-0 z-30 max-h-[78%] overflow-y-auto rounded-t-[1.75rem] bg-paper p-5 pb-6 shadow-2xl"
       action={(formData) => {
         setMessage(null);
         start(async () => {
@@ -682,7 +814,7 @@ function TreeCapture({
     >
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-display text-3xl">New tree</h2>
-        <button type="button" onClick={onClose} className="text-sm text-muted">
+        <button type="button" onClick={onClose} className="tap px-2 text-sm font-semibold text-muted">
           Cancel
         </button>
       </div>
@@ -753,7 +885,7 @@ function TreeCapture({
           required
           value={speciesName}
           onChange={(e) => setSpeciesName(e.target.value)}
-          className="tap w-full rounded-2xl border border-line bg-white px-3"
+          className="tap w-full rounded-2xl border border-line bg-white px-3 text-base"
         />
         <datalist id="species-list">
           {species.map((row) => (
@@ -765,7 +897,7 @@ function TreeCapture({
       </label>
 
       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted">Planting year</p>
-      <div className="mt-1 flex gap-2">
+      <div className="mt-1 flex flex-wrap gap-2">
         {YEARS.map((value) => (
           <Chip key={value} on={year === value} onClick={() => setYear(value)}>
             {value}
@@ -774,7 +906,7 @@ function TreeCapture({
       </div>
 
       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted">Habit</p>
-      <div className="mt-1 flex gap-2">
+      <div className="mt-1 flex flex-wrap gap-2">
         {habitOptions.map((opt) => (
           <Chip key={opt.value} on={habit === opt.value} onClick={() => setHabit(opt.value)}>
             {opt.label}
@@ -783,7 +915,7 @@ function TreeCapture({
       </div>
 
       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted">Health</p>
-      <div className="mt-1 flex gap-2">
+      <div className="mt-1 flex flex-wrap gap-2">
         {healthOptions.map((opt) => (
           <Chip key={opt.value} on={health === opt.value} onClick={() => setHealth(opt.value)}>
             {opt.label}
@@ -793,8 +925,8 @@ function TreeCapture({
 
       <label className="mt-3 block">
         <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-muted">Zone</span>
-        <select name="zone" className="tap w-full rounded-2xl border border-line bg-white px-3">
-          {zoneLabels.map((label) => (
+        <select name="zone" className="tap w-full rounded-2xl border border-line bg-white px-3 text-base">
+          {zoneChoices.map((label) => (
             <option key={label}>{label}</option>
           ))}
         </select>
@@ -802,7 +934,7 @@ function TreeCapture({
 
       <label className="mt-3 block">
         <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-muted">Note</span>
-        <textarea name="note" rows={2} className="w-full rounded-2xl border border-line bg-white px-3 py-2" />
+        <textarea name="note" rows={2} className="w-full rounded-2xl border border-line bg-white px-3 py-2 text-base" />
       </label>
 
       {nearby[0] ? (
@@ -813,13 +945,15 @@ function TreeCapture({
       ) : null}
       {message ? <p className="mt-2 text-sm font-semibold text-clay">{message}</p> : null}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="tap mt-4 w-full rounded-full bg-leaf-deep font-semibold text-cream disabled:opacity-60"
-      >
-        {pending ? "Saving…" : force ? "Save anyway" : "Pin this tree"}
-      </button>
+      <div className="sticky bottom-0 -mx-5 mt-4 bg-paper px-5 pt-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="tap w-full rounded-full bg-leaf-deep font-semibold text-cream disabled:opacity-60"
+        >
+          {pending ? "Saving…" : force ? "Save anyway" : "Pin this tree"}
+        </button>
+      </div>
     </form>
   );
 }
@@ -842,4 +976,9 @@ function Chip({
 
 function emptyFc() {
   return { type: "FeatureCollection" as const, features: [] };
+}
+
+function usablePolygon(polygon: GeoPolygon | null | undefined) {
+  const ring = polygon?.coordinates?.[0];
+  return Boolean(polygon && polygon.type === "Polygon" && ring && ring.length >= 4);
 }

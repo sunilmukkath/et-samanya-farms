@@ -1,5 +1,7 @@
 import type { AiSuggestion, ObservationDomain, TreeHabit, TreeHealth } from "@/db/schema";
+import { domainCatalogBySlug } from "@/lib/packs/domains";
 import { fileToBase64 } from "@/lib/photos";
+import { getFarmProfile } from "@/lib/profile";
 
 const HABITS: TreeHabit[] = ["sapling", "young", "mature"];
 const HEALTH: TreeHealth[] = ["healthy", "watch", "stressed", "dead"];
@@ -7,15 +9,20 @@ const HEALTH: TreeHealth[] = ["healthy", "watch", "stressed", "dead"];
 export type VisionPack = "tree" | "plant_health" | "compost" | "cattle";
 
 export function visionPackForDomain(domain: ObservationDomain): VisionPack {
-  if (domain === "plant_health") return "plant_health";
-  if (domain === "soil") return "compost";
-  if (domain === "animals") return "cattle";
-  return "tree";
+  return domainCatalogBySlug[domain]?.visionPack ?? "tree";
 }
 
-function packPrompt(pack: VisionPack) {
+async function farmLine() {
+  const profile = await getFarmProfile();
+  const acres = profile.acres ? `${profile.acres}-acre ` : "";
+  const place = profile.location.village || profile.location.address || "this farm";
+  return `${acres}${profile.name} in ${place}`;
+}
+
+async function packPrompt(pack: VisionPack) {
+  const farm = await farmLine();
   if (pack === "plant_health") {
-    return `You help a 5-acre agroforestry farm in Tamil Nadu read plant health from a phone photo.
+    return `You help ${farm} read plant health from a phone photo.
 Identify crop or tree if possible, likely pest/disease/stress (issue), health, and a cultural control (no pesticide push unless the photo clearly shows sprayed residue).
 Return ONLY JSON with keys: species, tamil, habit, health, confidence, rationale, issue, culturalControl.
 habit one of: sapling, young, mature (or null).
@@ -23,17 +30,17 @@ health one of: healthy, watch, stressed, dead.
 confidence 0-1.`;
   }
   if (pack === "compost") {
-    return `You read compost or mulch heaps on a Tamil Nadu agroforestry farm.
+    return `You read compost or mulch heaps on ${farm}.
 Judge maturity (fresh / turning / ready) and moisture. Suggest the next physical action.
 Return ONLY JSON with keys: species, tamil, habit, health, confidence, rationale, compostMaturity.
 species can be "compost". health: healthy if ready, watch if turning, stressed if anaerobic/dry.`;
   }
   if (pack === "cattle") {
-    return `You read cattle or farm animals in Tamil Nadu from a phone photo.
+    return `You read farm animals at ${farm} from a phone photo.
 Return ONLY JSON with keys: species, tamil, habit, health, confidence, rationale, cattleCondition.
 species is the animal kind. health maps condition: healthy, watch, stressed.`;
   }
-  return `You help census trees and saplings on a 5-acre agroforestry farm in Tamil Nadu, India.
+  return `You help census trees and saplings on ${farm}.
 Identify the most likely species (common English name), Tamil name if you know it, growth habit, and health.
 Return ONLY JSON with keys: species, tamil, habit, health, confidence, rationale.
 habit must be one of: sapling, young, mature.
@@ -45,7 +52,7 @@ If it is not a plant, species should be "unknown" and confidence low.`;
 export async function geminiGenerateJson(prompt: string, file?: File) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const parts: { text?: string; inline_data?: { mime_type: string; data: string } }[] = [{ text: prompt }];
   if (file) {
     parts.push({
@@ -74,7 +81,7 @@ export async function geminiGenerateJson(prompt: string, file?: File) {
 export async function geminiGenerateText(prompt: string) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {
@@ -97,7 +104,7 @@ export async function suggestFromImage(
   file: File,
   pack: VisionPack = "tree",
 ): Promise<AiSuggestion | null> {
-  const text = await geminiGenerateJson(packPrompt(pack), file);
+  const text = await geminiGenerateJson(await packPrompt(pack), file);
   if (!text) return null;
 
   try {

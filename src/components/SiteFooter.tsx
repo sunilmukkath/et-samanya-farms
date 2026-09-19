@@ -25,7 +25,7 @@ export async function SiteFooter() {
           <ul className="mt-3 space-y-2 text-sm">
             {site.nav.map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="hover:text-sun">
+                <Link href={item.href} className="inline-flex min-h-11 items-center hover:text-sun">
                   {item.label}
                 </Link>
               </li>
@@ -38,10 +38,10 @@ export async function SiteFooter() {
           <p className="mt-3 text-sm leading-relaxed">
             {site.location.address}
           </p>
-          <a href={site.phoneHref} className="mt-3 inline-block text-sm underline decoration-sun underline-offset-4">
+          <a href={site.phoneHref} className="mt-3 inline-flex min-h-11 items-center text-sm underline decoration-sun underline-offset-4">
             {site.phoneDisplay}
           </a>
-          <a href={`mailto:${site.email}`} className="mt-2 block text-sm underline decoration-sun underline-offset-4">
+          <a href={`mailto:${site.email}`} className="inline-flex min-h-11 items-center text-sm underline decoration-sun underline-offset-4">
             {site.email}
           </a>
         </div>

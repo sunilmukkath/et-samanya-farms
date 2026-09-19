@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { seedPlots, seedSpecies, zoneLabels } from "@/lib/farm";
 import * as schema from "@/db/schema";
+import { seedFarmProfile } from "@/lib/farm.config";
 
 type Database = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -124,6 +124,7 @@ export async function ensureSchema() {
 
   await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS plot_id text`;
   await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS animal_id text`;
+  await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS plant_stand_id text`;
   await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS source text`;
   await sql`ALTER TABLE observations ADD COLUMN IF NOT EXISTS created_by text`;
 
@@ -165,9 +166,91 @@ export async function ensureSchema() {
     created_at timestamptz NOT NULL DEFAULT now()
   )`;
 
+  await sql`CREATE TABLE IF NOT EXISTS farm_profile (
+    id text PRIMARY KEY,
+    config jsonb NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS plant_stands (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    crop text NOT NULL,
+    stage text NOT NULL DEFAULT 'growing',
+    plot_id text,
+    planted_on date,
+    note text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS devices (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    kind text NOT NULL,
+    protocol text NOT NULL DEFAULT 'http',
+    token_hash text,
+    plot_id text,
+    plant_stand_id text,
+    tree_id text,
+    animal_id text,
+    lat double precision,
+    lng double precision,
+    firmware text,
+    last_seen_at timestamptz,
+    battery_v double precision,
+    rssi double precision,
+    config jsonb,
+    status text NOT NULL DEFAULT 'offline',
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS devices_kind_idx ON devices (kind)`;
+  await sql`CREATE INDEX IF NOT EXISTS devices_status_idx ON devices (status)`;
+
+  await sql`CREATE TABLE IF NOT EXISTS readings (
+    id text NOT NULL,
+    device_id text NOT NULL,
+    metric text NOT NULL,
+    value double precision NOT NULL,
+    unit text,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    payload jsonb
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS readings_device_recorded_idx ON readings (device_id, recorded_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS readings_metric_idx ON readings (metric, recorded_at DESC)`;
+
+  await sql`CREATE TABLE IF NOT EXISTS alerts (
+    id text PRIMARY KEY,
+    title text NOT NULL,
+    detail text,
+    device_id text,
+    rule_id text,
+    acknowledged_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS firmware_artifacts (
+    id text PRIMARY KEY,
+    device_kind text NOT NULL,
+    version text NOT NULL,
+    url text NOT NULL,
+    sha256 text,
+    notes text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  try {
+    await sql`CREATE EXTENSION IF NOT EXISTS timescaledb`;
+    await sql.unsafe(`SELECT create_hypertable('readings', 'recorded_at', if_not_exists => TRUE)`);
+  } catch {
+    /* vanilla Postgres is fine — readings stay a regular table */
+  }
+
+  const seed = seedFarmProfile();
+
   const existingSpecies = await sql`SELECT count(*)::int AS count FROM species_catalog`;
   if (!existingSpecies[0]?.count) {
-    for (const row of seedSpecies) {
+    for (const row of seed.seedSpecies) {
       await sql`INSERT INTO species_catalog (id, name, tamil, category, created_at)
         VALUES (${crypto.randomUUID()}, ${row.name}, ${row.tamil}, ${row.category}, now())
         ON CONFLICT (name) DO NOTHING`;
@@ -176,7 +259,7 @@ export async function ensureSchema() {
 
   const existingZones = await sql`SELECT count(*)::int AS count FROM farm_zones`;
   if (!existingZones[0]?.count) {
-    for (const name of zoneLabels) {
+    for (const name of seed.zoneLabels) {
       await sql`INSERT INTO farm_zones (id, name, polygon, created_at)
         VALUES (${crypto.randomUUID()}, ${name}, NULL, now())`;
     }
@@ -186,10 +269,19 @@ export async function ensureSchema() {
 
   const existingPlots = await sql`SELECT count(*)::int AS count FROM plots`;
   if (!existingPlots[0]?.count) {
-    for (const plot of seedPlots) {
+    for (const plot of seed.seedPlots) {
       await sql`INSERT INTO plots (id, name, kind, polygon, note, created_at)
         VALUES (${crypto.randomUUID()}, ${plot.name}, ${plot.kind}, NULL, NULL, now())`;
     }
+  }
+
+  const existingProfile = await sql`SELECT count(*)::int AS count FROM farm_profile`;
+  if (!existingProfile[0]?.count) {
+    await getDb().insert(schema.farmProfile).values({
+      id: "farm",
+      config: seed as unknown as Record<string, unknown>,
+      updatedAt: new Date(),
+    });
   }
 
   globalForDb.farmDbReady = true;

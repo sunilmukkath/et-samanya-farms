@@ -39,10 +39,10 @@ async function LoginForm({
       />
       <div className="absolute inset-0 bg-gradient-to-t from-leaf-deep via-leaf-deep/75 to-leaf-deep/35" />
 
-      <div className="relative z-10 mx-auto w-full max-w-sm px-5 pb-12 pt-[max(3rem,env(safe-area-inset-top))]">
+      <div className="relative z-10 mx-auto w-full max-w-sm px-5 pb-[max(3rem,calc(1.25rem+env(safe-area-inset-bottom)))] pt-[max(3rem,env(safe-area-inset-top))]">
         <BrandLockup variant="white" className="h-12 sm:h-14" />
         <p className="font-tamil mt-3 text-sand">சாமான்ய உணவு</p>
-        <h1 className="mt-6 font-display text-5xl tracking-tight">Farm log</h1>
+        <h1 className="mt-6 font-display text-4xl tracking-tight sm:text-5xl">Farm log</h1>
         <p className="mt-3 text-base leading-relaxed text-sand">
           Field notebook for {site.location.village}. Phone first, under the trees.
         </p>
@@ -89,7 +89,7 @@ async function LoginForm({
                   type="email"
                   required
                   defaultValue={allowed[0]}
-                  className="tap mt-1 w-full rounded-2xl border-0 bg-white px-3 text-ink"
+                  className="tap mt-1 w-full rounded-2xl border-0 bg-white px-3 text-base text-ink"
                 />
               </label>
               <label className="block text-xs font-semibold uppercase tracking-[0.16em] text-sand">
@@ -98,7 +98,7 @@ async function LoginForm({
                   name="password"
                   type="password"
                   required
-                  className="tap mt-1 w-full rounded-2xl border-0 bg-white px-3 text-ink"
+                  className="tap mt-1 w-full rounded-2xl border-0 bg-white px-3 text-base text-ink"
                 />
               </label>
               <button type="submit" className="tap w-full rounded-full bg-leaf font-semibold text-leaf-deep">

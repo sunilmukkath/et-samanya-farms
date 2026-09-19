@@ -1,21 +1,20 @@
-import { unstable_cache } from "next/cache";
 import type { WeatherSnapshot } from "@/db/schema";
-import { farmCoords } from "@/lib/farm";
+import { getFarmProfile } from "@/lib/profile";
 
 export type FarmWeather = WeatherSnapshot & {
   week: { date: string; rainMm: number; maxC: number | null; minC: number | null }[];
 };
 
-async function fetchFarmWeather(): Promise<FarmWeather | null> {
+async function fetchFarmWeather(lat: number, lng: number, timezone: string): Promise<FarmWeather | null> {
   const url = new URL("https://api.open-meteo.com/v1/forecast");
-  url.searchParams.set("latitude", String(farmCoords.lat));
-  url.searchParams.set("longitude", String(farmCoords.lng));
+  url.searchParams.set("latitude", String(lat));
+  url.searchParams.set("longitude", String(lng));
   url.searchParams.set(
     "current",
     "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code",
   );
   url.searchParams.set("daily", "precipitation_sum,temperature_2m_max,temperature_2m_min");
-  url.searchParams.set("timezone", "Asia/Kolkata");
+  url.searchParams.set("timezone", timezone || "Asia/Kolkata");
   url.searchParams.set("forecast_days", "7");
 
   const res = await fetch(url, { next: { revalidate: 600 } });
@@ -58,13 +57,15 @@ async function fetchFarmWeather(): Promise<FarmWeather | null> {
   };
 }
 
-export const getFarmWeather = unstable_cache(fetchFarmWeather, ["farm-weather"], {
-  revalidate: 600,
-});
+export async function getFarmWeather() {
+  const profile = await getFarmProfile();
+  return fetchFarmWeather(profile.location.lat, profile.location.lng, profile.timezone);
+}
 
 export function weatherSnapshot(weather: FarmWeather | null): WeatherSnapshot | null {
   if (!weather) return null;
-  const { week: _week, ...snapshot } = weather;
+  const { week, ...snapshot } = weather;
+  void week;
   return snapshot;
 }
 

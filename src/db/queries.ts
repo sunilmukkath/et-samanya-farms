@@ -2,29 +2,43 @@ import { and, desc, eq, gte, ilike, isNull, or, sql } from "drizzle-orm";
 import { fileStore } from "@/db/file-store";
 import { ensureSchema, getDb, isDatabaseConfigured } from "@/db/index";
 import {
+  alerts,
   animals,
   briefs,
+  devices,
+  farmProfile,
   farmZones,
+  firmwareArtifacts,
   ledger,
   observations,
+  plantStands,
   plots,
+  readings,
   speciesCatalog,
   tasks,
   trees,
+  type AlertRow,
   type AnimalRow,
   type BriefRow,
+  type DeviceKind,
+  type DeviceRow,
+  type DeviceStatus,
+  type FirmwareRow,
   type GeoPolygon,
   type LedgerRow,
   type ObservationDomain,
   type ObservationRow,
+  type PlantStandRow,
   type PlotKind,
   type PlotRow,
+  type ReadingRow,
   type SpeciesRow,
   type TaskRow,
   type TreeHealth,
   type TreeRow,
   type ZoneRow,
 } from "@/db/schema";
+import type { FarmProfile } from "@/lib/packs/types";
 import { nearestPoints } from "@/lib/geo";
 
 export { isDatabaseConfigured };
@@ -199,11 +213,12 @@ export async function nearbyTrees(lat: number, lng: number, excludeId?: string) 
 
 export type NewObservation = Omit<
   ObservationRow,
-  "id" | "createdAt" | "plotId" | "animalId" | "source" | "createdBy"
+  "id" | "createdAt" | "plotId" | "animalId" | "plantStandId" | "source" | "createdBy"
 > & {
   id?: string;
   plotId?: string | null;
   animalId?: string | null;
+  plantStandId?: string | null;
   source?: ObservationRow["source"];
   createdBy?: string | null;
 };
@@ -214,6 +229,7 @@ export async function insertObservation(input: NewObservation) {
     id: input.id ?? crypto.randomUUID(),
     plotId: input.plotId ?? null,
     animalId: input.animalId ?? null,
+    plantStandId: input.plantStandId ?? null,
     source: input.source ?? null,
     createdBy: input.createdBy ?? null,
     createdAt: new Date(),
@@ -230,6 +246,7 @@ export async function listObservations(
     treeId?: string;
     plotId?: string;
     animalId?: string;
+    plantStandId?: string;
     query?: string;
     since?: Date;
     limit?: number;
@@ -243,10 +260,11 @@ export async function listObservations(
   if (opts.treeId) filters.push(eq(observations.treeId, opts.treeId));
   if (opts.plotId) filters.push(eq(observations.plotId, opts.plotId));
   if (opts.animalId) filters.push(eq(observations.animalId, opts.animalId));
+  if (opts.plantStandId) filters.push(eq(observations.plantStandId, opts.plantStandId));
   if (opts.domain) filters.push(eq(observations.domain, opts.domain));
   if (opts.since) filters.push(gte(observations.occurredAt, opts.since));
   if (opts.query) {
-    const q = `%${opts.query}%`;
+    const q = `%${opts.query.replace(/[%_]/g, "")}%`;
     filters.push(or(ilike(observations.note, q), sql`coalesce(${observations.details}::text, '') ilike ${q}`));
   }
   const where = filters.length ? and(...filters) : undefined;
@@ -425,4 +443,205 @@ export async function listObservationsSince(since: Date, limit = 400) {
   return listObservations({ since, limit });
 }
 
-export type { PlotKind };
+export async function getFarmProfileRecord(): Promise<FarmProfile | null> {
+  if (fileStoreEnabled()) return fileStore.getFarmProfileRecord();
+  if (!isDatabaseConfigured()) return null;
+  const client = await db();
+  const rows = await client.select().from(farmProfile).limit(1);
+  const config = rows[0]?.config;
+  if (!config || typeof config !== "object") return null;
+  return config as FarmProfile;
+}
+
+export async function saveFarmProfileRecord(profile: FarmProfile) {
+  const row = { id: "farm", config: profile as unknown as Record<string, unknown>, updatedAt: new Date() };
+  if (fileStoreEnabled()) return fileStore.saveFarmProfileRecord(profile);
+  const client = await db();
+  const existing = await client.select({ id: farmProfile.id }).from(farmProfile).limit(1);
+  if (existing[0]) {
+    await client.update(farmProfile).set({ config: row.config, updatedAt: row.updatedAt }).where(eq(farmProfile.id, existing[0].id));
+    return profile;
+  }
+  await client.insert(farmProfile).values(row);
+  return profile;
+}
+
+export async function listPlantStands(): Promise<PlantStandRow[]> {
+  if (fileStoreEnabled()) return fileStore.listPlantStands();
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  return client.select().from(plantStands).orderBy(plantStands.name);
+}
+
+export async function insertPlantStand(
+  input: Omit<PlantStandRow, "id" | "createdAt" | "updatedAt"> & { id?: string },
+) {
+  const now = new Date();
+  const row: PlantStandRow = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  if (fileStoreEnabled()) return fileStore.insertPlantStand(row);
+  const client = await db();
+  await client.insert(plantStands).values(row);
+  return row;
+}
+
+export async function updatePlantStand(id: string, patch: Partial<Omit<PlantStandRow, "id" | "createdAt">>) {
+  const next = { ...patch, updatedAt: new Date() };
+  if (fileStoreEnabled()) return fileStore.updatePlantStand(id, next);
+  const client = await db();
+  await client.update(plantStands).set(next).where(eq(plantStands.id, id));
+}
+
+export async function listDevices(): Promise<DeviceRow[]> {
+  if (fileStoreEnabled()) return fileStore.listDevices();
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  return client.select().from(devices).orderBy(devices.name);
+}
+
+export async function getDevice(id: string): Promise<DeviceRow | null> {
+  if (fileStoreEnabled()) return fileStore.getDevice(id);
+  if (!isDatabaseConfigured()) return null;
+  const client = await db();
+  const rows = await client.select().from(devices).where(eq(devices.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getDeviceByTokenHash(tokenHash: string): Promise<DeviceRow | null> {
+  if (fileStoreEnabled()) return fileStore.getDeviceByTokenHash(tokenHash);
+  if (!isDatabaseConfigured()) return null;
+  const client = await db();
+  const rows = await client.select().from(devices).where(eq(devices.tokenHash, tokenHash)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function insertDevice(input: Omit<DeviceRow, "id" | "createdAt"> & { id?: string }) {
+  const row: DeviceRow = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    createdAt: new Date(),
+  };
+  if (fileStoreEnabled()) return fileStore.insertDevice(row);
+  const client = await db();
+  await client.insert(devices).values(row);
+  return row;
+}
+
+export async function updateDevice(id: string, patch: Partial<Omit<DeviceRow, "id" | "createdAt">>) {
+  if (fileStoreEnabled()) return fileStore.updateDevice(id, patch);
+  const client = await db();
+  await client.update(devices).set(patch).where(eq(devices.id, id));
+}
+
+export async function insertReading(input: Omit<ReadingRow, "id"> & { id?: string }) {
+  const row: ReadingRow = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+  };
+  if (fileStoreEnabled()) return fileStore.insertReading(row);
+  const client = await db();
+  await client.insert(readings).values(row);
+  return row;
+}
+
+export async function listReadings(
+  opts: { deviceId?: string; metric?: string; since?: Date; limit?: number } = {},
+): Promise<ReadingRow[]> {
+  if (fileStoreEnabled()) return fileStore.listReadings(opts);
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  const filters = [];
+  if (opts.deviceId) filters.push(eq(readings.deviceId, opts.deviceId));
+  if (opts.metric) filters.push(eq(readings.metric, opts.metric));
+  if (opts.since) filters.push(gte(readings.recordedAt, opts.since));
+  const where = filters.length ? and(...filters) : undefined;
+  return client
+    .select()
+    .from(readings)
+    .where(where)
+    .orderBy(desc(readings.recordedAt))
+    .limit(opts.limit ?? 200);
+}
+
+export async function latestReadings(): Promise<ReadingRow[]> {
+  if (fileStoreEnabled()) return fileStore.latestReadings();
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  const rows = await client.select().from(readings).orderBy(desc(readings.recordedAt)).limit(4000);
+  const map = new Map<string, ReadingRow>();
+  for (const row of rows) {
+    const key = `${row.deviceId}:${row.metric}`;
+    if (!map.has(key)) map.set(key, row);
+  }
+  return [...map.values()];
+}
+
+export async function listAlerts(includeAck = false): Promise<AlertRow[]> {
+  if (fileStoreEnabled()) return fileStore.listAlerts(includeAck);
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  if (includeAck) {
+    return client.select().from(alerts).orderBy(desc(alerts.createdAt)).limit(80);
+  }
+  return client.select().from(alerts).where(isNull(alerts.acknowledgedAt)).orderBy(desc(alerts.createdAt)).limit(80);
+}
+
+export async function insertAlert(input: Omit<AlertRow, "id" | "createdAt"> & { id?: string }) {
+  const row: AlertRow = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    createdAt: new Date(),
+  };
+  if (fileStoreEnabled()) return fileStore.insertAlert(row);
+  const client = await db();
+  const open = await client
+    .select()
+    .from(alerts)
+    .where(and(isNull(alerts.acknowledgedAt), eq(alerts.title, row.title)));
+  if (open.some((alert) => alert.deviceId === row.deviceId)) return open[0];
+  await client.insert(alerts).values(row);
+  return row;
+}
+
+export async function acknowledgeAlert(id: string) {
+  if (fileStoreEnabled()) return fileStore.acknowledgeAlert(id);
+  const client = await db();
+  await client.update(alerts).set({ acknowledgedAt: new Date() }).where(eq(alerts.id, id));
+}
+
+export async function listFirmware(): Promise<FirmwareRow[]> {
+  if (fileStoreEnabled()) return fileStore.listFirmware();
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  return client.select().from(firmwareArtifacts).orderBy(desc(firmwareArtifacts.createdAt));
+}
+
+export async function insertFirmware(input: Omit<FirmwareRow, "id" | "createdAt"> & { id?: string }) {
+  const row: FirmwareRow = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    createdAt: new Date(),
+  };
+  if (fileStoreEnabled()) return fileStore.insertFirmware(row);
+  const client = await db();
+  await client.insert(firmwareArtifacts).values(row);
+  return row;
+}
+
+export async function markStaleDevices(staleMinutes = 120) {
+  const cutoff = new Date(Date.now() - staleMinutes * 60 * 1000);
+  const rows = await listDevices();
+  for (const device of rows) {
+    if (device.status === "offline") continue;
+    const seen = device.lastSeenAt;
+    if (!seen || seen < cutoff) {
+      await updateDevice(device.id, { status: "stale" satisfies DeviceStatus });
+    }
+  }
+}
+
+export type { DeviceKind, PlotKind };

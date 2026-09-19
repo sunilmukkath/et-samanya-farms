@@ -1,14 +1,14 @@
 import { completeTaskAction, deriveTasksAction } from "@/app/admin/actions";
 import { listTasks } from "@/db/queries";
-import { domainBySlug } from "@/lib/farm";
+import { getRuntimeFarm } from "@/lib/profile";
 import Link from "next/link";
 
 export default async function TasksPage() {
-  const open = await listTasks(false);
+  const [open, runtime] = await Promise.all([listTasks(false), getRuntimeFarm()]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5">
-      <h1 className="font-display text-4xl">Work list</h1>
+      <h1 className="font-display text-3xl sm:text-4xl">Work list</h1>
       <p className="mt-2 text-sm text-ink-soft">
         Recheck stressed trees, turn compost, inspect drip after rain. Ticking a task means you did the walk —
         log what you saw.
@@ -28,7 +28,7 @@ export default async function TasksPage() {
             <li key={task.id} className="rounded-3xl border border-line bg-white px-4 py-4">
               <p className="font-display text-xl leading-tight">{task.title}</p>
               <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">
-                {task.source} {task.domain ? `· ${domainBySlug[task.domain]?.label ?? task.domain}` : ""}
+                {task.source} {task.domain ? `· ${runtime.domainBySlug[task.domain]?.label ?? task.domain}` : ""}
               </p>
               <div className="mt-3 flex gap-2">
                 {task.domain ? (

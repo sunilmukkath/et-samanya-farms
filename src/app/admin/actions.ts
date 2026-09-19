@@ -2,23 +2,32 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  acknowledgeAlert,
   canPersistFarmData,
   completeTask,
+  getDevice,
   getTree,
   insertAnimal,
+  insertDevice,
   insertLedger,
   insertObservation,
+  insertPlantStand,
   insertPlot,
   insertTree,
+  listAnimals,
   listObservations,
+  listPlantStands,
   nearbyTrees,
   saveFarmBoundary,
+  saveFarmProfileRecord,
   updatePlot,
   updateTree,
   upsertSpecies,
 } from "@/db/queries";
 import type {
   AiSuggestion,
+  DeviceKind,
+  DeviceProtocol,
   GeoPolygon,
   LedgerKind,
   ObservationDetails,
@@ -29,8 +38,18 @@ import type {
   TreeHealth,
 } from "@/db/schema";
 import { farmRole, requireAdmin, requireOperator } from "@/lib/admin";
+import { askFarm } from "@/lib/ask";
 import { generateFarmBrief } from "@/lib/brief";
+import { detailsFromFields, resolveFieldOptions } from "@/lib/capture";
+import { applyPhi } from "@/lib/phi";
+import { parseSpokenLog } from "@/lib/voice-log";
 import { isObservationDomain, plotKindOptions } from "@/lib/farm";
+import { hashDeviceToken, mintDeviceToken } from "@/lib/iot/tokens";
+import { actuationAllowed, recordActuation } from "@/lib/iot/ota";
+import { isPackId } from "@/lib/packs/resolve";
+import type { PackId } from "@/lib/packs/types";
+import { biomeById } from "@/lib/profiles/biomes";
+import { clearFarmProfileCache, getFarmProfile, getRuntimeFarm } from "@/lib/profile";
 import { uploadPhoto } from "@/lib/photos";
 import { deriveFarmTasks } from "@/lib/tasks";
 import { suggestFromImage, visionPackForDomain, type VisionPack } from "@/lib/vision";
@@ -47,6 +66,9 @@ function revalidateAdmin() {
   revalidatePath("/admin/ledger");
   revalidatePath("/admin/plots");
   revalidatePath("/admin/animals");
+  revalidatePath("/admin/nodes");
+  revalidatePath("/admin/stands");
+  revalidatePath("/admin/setup");
   revalidatePath("/harvest");
 }
 
@@ -84,93 +106,8 @@ function sourceValue(value: string, role: "operator" | "staff" | null): Observat
   return "operator";
 }
 
-function detailsFromForm(domain: ObservationDomain, form: FormData): ObservationDetails {
-  const details: ObservationDetails = {};
-  if (domain === "harvest" || domain === "plants" || domain === "plant_health") {
-    const crop = str(form, "crop");
-    if (crop) details.crop = crop;
-  }
-  if (domain === "harvest") {
-    const quantity = num(form, "quantity");
-    if (quantity != null) details.quantity = quantity;
-    const unit = str(form, "unit");
-    if (unit) details.unit = unit;
-    const destination = str(form, "destination");
-    if (destination) details.destination = destination;
-  }
-  if (domain === "rain") {
-    const rainMm = num(form, "rainMm");
-    if (rainMm != null) details.rainMm = rainMm;
-    const pondLevel = str(form, "pondLevel");
-    if (pondLevel) details.pondLevel = pondLevel;
-    const irrigationMinutes = num(form, "irrigationMinutes");
-    if (irrigationMinutes != null) details.irrigationMinutes = irrigationMinutes;
-    const pump = str(form, "pumpOn");
-    if (pump === "On") details.pumpOn = true;
-    if (pump === "Off") details.pumpOn = false;
-    const canalNote = str(form, "canalNote");
-    if (canalNote) details.canalNote = canalNote;
-    const tankLevel = str(form, "tankLevel");
-    if (tankLevel) details.tankLevel = tankLevel;
-  }
-  if (domain === "soil") {
-    const moisture = str(form, "moisture");
-    if (moisture) details.moisture = moisture;
-    const action = str(form, "action");
-    if (action) details.action = action;
-  }
-  if (domain === "plants") {
-    const stage = str(form, "stage");
-    if (stage) details.stage = stage;
-  }
-  if (domain === "animals") {
-    const animalKind = str(form, "animalKind");
-    if (animalKind) details.animalKind = animalKind;
-    const animalCount = num(form, "animalCount");
-    if (animalCount != null) details.animalCount = animalCount;
-    const animalCondition = str(form, "animalCondition");
-    if (animalCondition) details.animalCondition = animalCondition;
-    const feedKg = num(form, "feedKg");
-    if (feedKg != null) details.feedKg = feedKg;
-  }
-  if (domain === "plant_health") {
-    const severity = str(form, "severity");
-    if (severity) details.severity = severity;
-  }
-  if (domain === "stay") {
-    const guestCount = num(form, "guestCount");
-    if (guestCount != null) details.guestCount = guestCount;
-    const stayFrom = str(form, "stayFrom");
-    if (stayFrom) details.stayFrom = stayFrom;
-    const stayTo = str(form, "stayTo");
-    if (stayTo) details.stayTo = stayTo;
-  }
-  if (domain === "activity") {
-    const activityType = str(form, "activityType");
-    if (activityType) details.activityType = activityType;
-    const attendees = num(form, "attendees");
-    if (attendees != null) details.attendees = attendees;
-    const hours = num(form, "hours");
-    if (hours != null) details.hours = hours;
-    const who = str(form, "who");
-    if (who) details.who = who;
-  }
-  if (domain === "trees") {
-    const action = str(form, "action");
-    if (action) details.action = action;
-    const crop = str(form, "species");
-    if (crop) details.crop = crop;
-  }
-  if (domain === "kit") {
-    const kitItem = str(form, "kitItem");
-    if (kitItem) details.kitItem = kitItem;
-    const kitStatus = str(form, "kitStatus");
-    if (kitStatus) details.kitStatus = kitStatus;
-    const hours = num(form, "hours");
-    if (hours != null) details.hours = hours;
-    const irrigationMinutes = num(form, "irrigationMinutes");
-    if (irrigationMinutes != null) details.irrigationMinutes = irrigationMinutes;
-  }
+function detailsFromForm(_domain: ObservationDomain, form: FormData, fields: import("@/lib/packs/types").CaptureField[]): ObservationDetails {
+  const details = detailsFromFields(fields, form);
   const sensorId = str(form, "sensorId");
   if (sensorId) details.sensorId = sensorId;
   const voiceLang = str(form, "voiceLang");
@@ -206,10 +143,13 @@ export async function createObservationAction(formData: FormData) {
   }
 
   const weather = weatherSnapshot(await getFarmWeather());
-  const details = detailsFromForm(domainRaw, formData);
+  const runtime = await getRuntimeFarm();
+  const details = detailsFromForm(domainRaw, formData, runtime.domainBySlug[domainRaw]?.fields ?? []);
+  if (domainRaw === "plant_health") applyPhi(details);
   const treeId = str(formData, "treeId") || null;
   const plotId = str(formData, "plotId") || null;
   const animalId = str(formData, "animalId") || null;
+  const plantStandId = str(formData, "plantStandId") || details.plantStandId || null;
   const role = farmRole(session.user?.email);
   const source = sourceValue(str(formData, "source"), role);
 
@@ -226,6 +166,7 @@ export async function createObservationAction(formData: FormData) {
     treeId,
     plotId,
     animalId,
+    plantStandId,
     source,
     createdBy: session.user?.email ?? null,
   });
@@ -382,6 +323,31 @@ export async function suggestTreeVisionAction(formData: FormData) {
   return { ok: true as const, suggestion };
 }
 
+export async function askFarmAction(question: string) {
+  await requireAdmin();
+  return askFarm(question);
+}
+
+export async function suggestVoiceLogAction(formData: FormData) {
+  await requireAdmin();
+  const transcript = str(formData, "transcript");
+  const domainRaw = str(formData, "domain");
+  if (!transcript || !isObservationDomain(domainRaw)) {
+    return { ok: false as const, error: "Speak a note first." };
+  }
+  const runtime = await getRuntimeFarm();
+  const fields = runtime.domainBySlug[domainRaw]?.fields ?? [];
+  const [animals, plantStands] = await Promise.all([listAnimals(), listPlantStands()]);
+  const resolved = fields.map((field) => ({
+    name: field.name,
+    label: field.label,
+    ...resolveFieldOptions(field, runtime, { animals, plantStands }),
+  }));
+  const fill = await parseSpokenLog(transcript, fields, resolved);
+  if (!fill) return { ok: false as const, error: "Could not hear that." };
+  return { ok: true as const, fill };
+}
+
 export async function saveBoundaryAction(points: { lat: number; lng: number }[]) {
   await requireAdmin();
   if (points.length < 3) return { ok: false as const, error: "Walk at least three points." };
@@ -472,9 +438,10 @@ export async function createAnimalAction(formData: FormData) {
   await requireAdmin();
   const name = str(formData, "name");
   if (!name) return;
+  const runtime = await getRuntimeFarm();
   await insertAnimal({
     name,
-    species: str(formData, "species") || "Cattle",
+    species: str(formData, "species") || runtime.defaultAnimalKind,
     sex: str(formData, "sex") || null,
     tag: str(formData, "tag") || null,
     bornOn: null,
@@ -498,5 +465,154 @@ export async function createLedgerAction(formData: FormData) {
     note: str(formData, "note") || null,
     observationId: null,
   });
+  revalidateAdmin();
+}
+
+export async function createPlantStandAction(formData: FormData) {
+  await requireAdmin();
+  const name = str(formData, "name");
+  const crop = str(formData, "crop");
+  if (!name || !crop) return;
+  const stageRaw = str(formData, "stage");
+  const stage =
+    stageRaw === "seedling" || stageRaw === "flowering" || stageRaw === "harvest" || stageRaw === "fallow"
+      ? stageRaw
+      : "growing";
+  await insertPlantStand({
+    name,
+    crop,
+    stage,
+    plotId: str(formData, "plotId") || null,
+    plantedOn: str(formData, "plantedOn") ? new Date(str(formData, "plantedOn")) : null,
+    note: str(formData, "note") || null,
+  });
+  revalidateAdmin();
+}
+
+export async function createDeviceAction(formData: FormData) {
+  await requireAdmin();
+  const name = str(formData, "name");
+  if (!name) return { ok: false as const, error: "Name the node." };
+  const kindRaw = str(formData, "kind");
+  const kind: DeviceKind =
+    kindRaw === "pond" ||
+    kindRaw === "weather" ||
+    kindRaw === "pump" ||
+    kindRaw === "valve" ||
+    kindRaw === "camera" ||
+    kindRaw === "counter" ||
+    kindRaw === "tank"
+      ? kindRaw
+      : "soil";
+  const protocolRaw = str(formData, "protocol");
+  const protocol: DeviceProtocol =
+    protocolRaw === "mqtt" || protocolRaw === "lora" ? protocolRaw : "http";
+  const token = mintDeviceToken();
+  const device = await insertDevice({
+    name,
+    kind,
+    protocol,
+    tokenHash: hashDeviceToken(token),
+    plotId: str(formData, "plotId") || null,
+    plantStandId: str(formData, "plantStandId") || null,
+    treeId: null,
+    animalId: null,
+    lat: num(formData, "lat"),
+    lng: num(formData, "lng"),
+    firmware: str(formData, "firmware") || null,
+    lastSeenAt: null,
+    batteryV: null,
+    rssi: null,
+    config: null,
+    status: "offline",
+  });
+  revalidateAdmin();
+  return { ok: true as const, id: device.id, token };
+}
+
+export async function commandDeviceAction(formData: FormData) {
+  await requireOperator();
+  const id = str(formData, "id");
+  const command = str(formData, "command") || "off";
+  const device = await getDevice(id);
+  if (!device) return;
+  if (device.kind !== "pump" && device.kind !== "valve") return;
+  const allowed = actuationAllowed(command, device.lastSeenAt);
+  if (!allowed.ok) return;
+  await recordActuation(id, command);
+  await insertObservation({
+    domain: "kit",
+    occurredAt: new Date(),
+    note: `Command ${command} → ${device.name}`,
+    photoUrl: null,
+    lat: device.lat,
+    lng: device.lng,
+    accuracyM: null,
+    weather: weatherSnapshot(await getFarmWeather()),
+    details: { kitItem: device.name, kitStatus: command === "on" ? "On" : "Off", deviceId: device.id, pumpOn: command === "on" },
+    treeId: device.treeId,
+    plotId: device.plotId,
+    animalId: null,
+    plantStandId: device.plantStandId,
+    source: "sensor",
+    createdBy: "operator",
+  });
+  revalidateAdmin();
+}
+
+export async function acknowledgeAlertAction(formData: FormData) {
+  await requireAdmin();
+  const id = str(formData, "id");
+  if (!id) return;
+  await acknowledgeAlert(id);
+  revalidateAdmin();
+}
+
+export async function saveFarmSetupAction(formData: FormData) {
+  await requireOperator();
+  const current = await getFarmProfile();
+  const packs = formData.getAll("packs").map(String).filter(isPackId) as PackId[];
+  const biome = biomeById(str(formData, "biomeId") || current.biomeId);
+  const lat = num(formData, "lat") ?? current.location.lat;
+  const lng = num(formData, "lng") ?? current.location.lng;
+  const applyBiome = str(formData, "applyBiome") === "1";
+  const next = {
+    ...current,
+    name: str(formData, "name") || current.name,
+    shortName: str(formData, "shortName") || current.shortName,
+    timezone: str(formData, "timezone") || current.timezone,
+    currency: str(formData, "currency") || current.currency,
+    units: str(formData, "units") === "imperial" ? "imperial" : "metric",
+    languages: str(formData, "languages")
+      ? str(formData, "languages").split(",").map((part) => part.trim()).filter(Boolean)
+      : current.languages,
+    acres: num(formData, "acres") ?? current.acres,
+    treeCensusTarget: num(formData, "treeCensusTarget"),
+    animalCensusTarget: num(formData, "animalCensusTarget"),
+    bedCensusTarget: num(formData, "bedCensusTarget"),
+    enabledPacks: packs.length ? packs : current.enabledPacks,
+    publicSite: str(formData, "publicSite") === "1",
+    biomeId: biome.id,
+    location: {
+      ...current.location,
+      lat,
+      lng,
+      village: str(formData, "village") || current.location.village,
+      address: str(formData, "address") || current.location.address,
+      timezone: str(formData, "timezone") || current.timezone,
+    },
+    onboardedAt: new Date().toISOString(),
+  };
+  if (applyBiome) {
+    next.harvestCrops = biome.harvestCrops;
+    next.seedSpecies = biome.seedSpecies;
+    next.seedPlots = biome.seedPlots;
+    next.zoneLabels = biome.zoneLabels;
+    next.kitItems = biome.kitItems;
+    next.defaultAnimalKind = biome.defaultAnimalKind;
+    next.rules = biome.rules;
+  }
+  await saveFarmProfileRecord(next);
+  clearFarmProfileCache();
   revalidateAdmin();
 }

@@ -33,6 +33,18 @@ export type TaskSource = (typeof taskSources)[number];
 export const ledgerKinds = ["expense", "income"] as const;
 export type LedgerKind = (typeof ledgerKinds)[number];
 
+export const deviceKinds = ["soil", "pond", "weather", "pump", "valve", "camera", "counter", "tank"] as const;
+export type DeviceKind = (typeof deviceKinds)[number];
+
+export const deviceProtocols = ["http", "mqtt", "lora"] as const;
+export type DeviceProtocol = (typeof deviceProtocols)[number];
+
+export const deviceStatuses = ["online", "stale", "error", "offline"] as const;
+export type DeviceStatus = (typeof deviceStatuses)[number];
+
+export const plantStandStages = ["seedling", "growing", "flowering", "harvest", "fallow"] as const;
+export type PlantStandStage = (typeof plantStandStages)[number];
+
 export type WeatherSnapshot = {
   tempC: number | null;
   humidity: number | null;
@@ -92,6 +104,11 @@ export type ObservationDetails = {
   sensorId?: string;
   voiceLang?: string;
   aiSuggestion?: AiSuggestion;
+  plantStandId?: string;
+  deviceId?: string;
+  sprayProduct?: string;
+  phiDays?: number;
+  safeToPickOn?: string;
 };
 
 export type BriefStats = {
@@ -183,6 +200,7 @@ export const observations = pgTable(
     treeId: text("tree_id"),
     plotId: text("plot_id"),
     animalId: text("animal_id"),
+    plantStandId: text("plant_stand_id"),
     source: text("source").$type<ObservationSource | null>(),
     createdBy: text("created_by"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
@@ -228,6 +246,86 @@ export const ledger = pgTable("ledger", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
 });
 
+export const farmProfile = pgTable("farm_profile", {
+  id: text("id").primaryKey(),
+  config: jsonb("config").$type<Record<string, unknown>>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+});
+
+export const plantStands = pgTable("plant_stands", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  crop: text("crop").notNull(),
+  stage: text("stage").$type<PlantStandStage>().notNull(),
+  plotId: text("plot_id"),
+  plantedOn: timestamp("planted_on", { mode: "date" }),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+});
+
+export const devices = pgTable(
+  "devices",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    kind: text("kind").$type<DeviceKind>().notNull(),
+    protocol: text("protocol").$type<DeviceProtocol>().notNull(),
+    tokenHash: text("token_hash"),
+    plotId: text("plot_id"),
+    plantStandId: text("plant_stand_id"),
+    treeId: text("tree_id"),
+    animalId: text("animal_id"),
+    lat: real("lat"),
+    lng: real("lng"),
+    firmware: text("firmware"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }),
+    batteryV: real("battery_v"),
+    rssi: real("rssi"),
+    config: jsonb("config").$type<Record<string, unknown> | null>(),
+    status: text("status").$type<DeviceStatus>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [index("devices_kind_idx").on(t.kind), index("devices_status_idx").on(t.status)],
+);
+
+export const readings = pgTable(
+  "readings",
+  {
+    id: text("id").notNull(),
+    deviceId: text("device_id").notNull(),
+    metric: text("metric").notNull(),
+    value: real("value").notNull(),
+    unit: text("unit"),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+  },
+  (t) => [
+    index("readings_device_recorded_idx").on(t.deviceId, t.recordedAt),
+    index("readings_metric_idx").on(t.metric, t.recordedAt),
+  ],
+);
+
+export const alerts = pgTable("alerts", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  detail: text("detail"),
+  deviceId: text("device_id"),
+  ruleId: text("rule_id"),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+});
+
+export const firmwareArtifacts = pgTable("firmware_artifacts", {
+  id: text("id").primaryKey(),
+  deviceKind: text("device_kind").$type<DeviceKind>().notNull(),
+  version: text("version").notNull(),
+  url: text("url").notNull(),
+  sha256: text("sha256"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+});
+
 export type SpeciesRow = typeof speciesCatalog.$inferSelect;
 export type ZoneRow = typeof farmZones.$inferSelect;
 export type PlotRow = typeof plots.$inferSelect;
@@ -237,3 +335,9 @@ export type ObservationRow = typeof observations.$inferSelect;
 export type TaskRow = typeof tasks.$inferSelect;
 export type BriefRow = typeof briefs.$inferSelect;
 export type LedgerRow = typeof ledger.$inferSelect;
+export type FarmProfileRow = typeof farmProfile.$inferSelect;
+export type PlantStandRow = typeof plantStands.$inferSelect;
+export type DeviceRow = typeof devices.$inferSelect;
+export type ReadingRow = typeof readings.$inferSelect;
+export type AlertRow = typeof alerts.$inferSelect;
+export type FirmwareRow = typeof firmwareArtifacts.$inferSelect;

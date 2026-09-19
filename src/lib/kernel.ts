@@ -40,8 +40,8 @@ export function kernelChecks(): KernelCheck[] {
       ok: vision,
       label: "Gemini vision",
       hint: vision
-        ? "Photo suggest is on. You still confirm species and health."
-        : "Optional: add GEMINI_API_KEY to suggest species, pests, and compost from photos.",
+        ? "Photo suggest and spoken answers are on. You still confirm before save."
+        : "Optional: add GEMINI_API_KEY to suggest from photos and answer spoken questions from the log.",
     },
   ];
 }

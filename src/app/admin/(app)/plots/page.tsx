@@ -8,9 +8,9 @@ export default async function PlotsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5">
-      <h1 className="font-display text-4xl">Plots</h1>
+      <h1 className="font-display text-3xl sm:text-4xl">Plots</h1>
       <p className="mt-2 text-sm text-ink-soft">
-        Named beds and yards. Attach logs to a plot so harvest and rain sit on a place, not only free text.
+        Named beds and yards. Walk an outline on the map so harvest and rain sit on a place.
       </p>
       <form action={createPlotAction} className="mt-5 space-y-3 rounded-3xl border border-line bg-white p-4">
         <input name="name" required placeholder="Name" className="tap w-full rounded-2xl border border-line px-3" />
@@ -26,18 +26,29 @@ export default async function PlotsPage() {
         </button>
       </form>
       <ul className="mt-6 space-y-3">
-        {rows.map((plot) => (
-          <li key={plot.id} className="rounded-3xl border border-line bg-white px-4 py-4">
-            <p className="font-display text-2xl">{plot.name}</p>
-            <p className="text-sm text-ink-soft">
-              {plotKindOptions.find((opt) => opt.value === plot.kind)?.label ?? plot.kind}
-              {plot.polygon ? " · outline on map" : " · name only for now"}
-            </p>
-            <Link href={`/admin/log?domain=plants`} className="mt-2 inline-block text-sm text-clay">
-              Log on a bed
-            </Link>
+        {rows.length === 0 ? (
+          <li className="rounded-3xl border border-line bg-white px-4 py-6 text-sm text-ink-soft">
+            Add horticulture, pond, or tree belts, then walk their edges.
           </li>
-        ))}
+        ) : (
+          rows.map((plot) => (
+            <li key={plot.id} className="rounded-3xl border border-line bg-white px-4 py-4">
+              <p className="font-display text-2xl">{plot.name}</p>
+              <p className="text-sm text-ink-soft">
+                {plotKindOptions.find((opt) => opt.value === plot.kind)?.label ?? plot.kind}
+                {plot.polygon ? " · outline on map" : " · name only for now"}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <Link href={`/admin/map?walkPlot=${plot.id}`} className="text-sm font-semibold text-leaf-deep">
+                  Walk outline
+                </Link>
+                <Link href="/admin/log?domain=plants" className="text-sm text-clay">
+                  Log on a bed
+                </Link>
+              </div>
+            </li>
+          ))
+        )}
       </ul>
     </div>
   );

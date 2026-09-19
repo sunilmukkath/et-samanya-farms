@@ -1,5 +1,6 @@
 import { dashboardStats, insertBrief, latestBrief, listObservations, listTasks, listTrees } from "@/db/queries";
 import type { BriefRow, BriefStats } from "@/db/schema";
+import { getFarmProfile } from "@/lib/profile";
 import { geminiGenerateText } from "@/lib/vision";
 import { getFarmWeather, weatherLabel } from "@/lib/weather";
 
@@ -62,10 +63,12 @@ export async function generateFarmBrief(kind: "daily" | "weekly" = "weekly"): Pr
     : "Weather pause.";
 
   let markdown = templateBrief(stats, weatherLine);
+  const profile = await getFarmProfile();
+  const acres = profile.acres ? `${profile.acres} acres` : "this farm";
   const model = await geminiGenerateText(
-    `You write a morning farm brief for ET Samanya, 5 acres in Thenkulapakkam, Tamil Nadu.
+    `You write a morning farm brief for ${profile.name}, ${acres} in ${profile.location.village || profile.location.address}.
 Use ONLY these facts. Do not invent numbers, species, or weather.
-6–10 short sentences. Tamil names in parentheses are welcome.
+6–10 short sentences. Local names in parentheses are welcome.
 Facts JSON:\n${JSON.stringify({ weatherLine, stats })}`,
   );
   if (model?.trim()) markdown = model.trim();

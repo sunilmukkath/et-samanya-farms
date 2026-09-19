@@ -1,4 +1,5 @@
-const KEY = "samanya-offline-logs";
+const KEY = "farm-os-offline-logs";
+const LEGACY_KEY = "samanya-offline-logs";
 
 export type QueuedLog = {
   id: string;
@@ -10,7 +11,8 @@ export type QueuedLog = {
 function readQueue(): QueuedLog[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(KEY) || "[]") as QueuedLog[];
+    const raw = localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || "[]";
+    return JSON.parse(raw) as QueuedLog[];
   } catch {
     return [];
   }

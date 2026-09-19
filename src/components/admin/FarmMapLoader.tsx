@@ -7,7 +7,7 @@ export const FarmMapLoader = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full min-h-[24rem] items-end bg-soil p-6 text-cream">
+      <div className="flex h-full min-h-0 flex-1 items-end bg-soil p-6 text-cream">
         Loading the farm map…
       </div>
     ),

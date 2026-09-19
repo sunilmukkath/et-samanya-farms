@@ -13,9 +13,9 @@ export default function PracticesPage() {
   return (
     <article>
       <header className="bg-leaf-deep text-cream">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sun">Practices</p>
-          <h1 className="mt-3 max-w-3xl font-display text-5xl tracking-tight sm:text-6xl">
+          <h1 className="mt-3 max-w-3xl font-display text-4xl tracking-tight sm:text-6xl">
             Agroforestry is how we keep a balance.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-cream/80">
@@ -26,7 +26,7 @@ export default function PracticesPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+      <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">
           Five principles that guide the work
         </p>
@@ -44,7 +44,7 @@ export default function PracticesPage() {
       </div>
 
       <div className="border-y border-line bg-cream">
-        <div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-8 md:grid-cols-[0.85fr_1.15fr] md:items-start">
+        <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-8 sm:py-16 md:grid-cols-[0.85fr_1.15fr] md:items-start">
           <div className="overflow-hidden rounded-[1.75rem]">
             <FarmPhoto
               src="/photos/solar.jpg"

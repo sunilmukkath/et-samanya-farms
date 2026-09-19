@@ -1,22 +1,35 @@
 import { CaptureSheet } from "@/components/admin/CaptureSheet";
 import { listObservations } from "@/db/queries";
+import { captureRuntimeFrom } from "@/lib/capture";
 import { timeAgo } from "@/lib/farm";
 import { isVisionConfigured } from "@/lib/farm";
+import { domainCatalogBySlug } from "@/lib/packs/domains";
+import { getRuntimeFarm } from "@/lib/profile";
 
 export default async function AdminStayPage() {
-  const rows = await listObservations({ domain: "stay", limit: 60 });
+  const [rows, runtime] = await Promise.all([listObservations({ domain: "stay", limit: 60 }), getRuntimeFarm()]);
 
   return (
     <div className="texture grain">
       <div className="mx-auto max-w-xl px-4 py-5">
         <p className="font-tamil text-base text-clay">தங்கல்</p>
-        <h1 className="font-display text-4xl">Farm stay</h1>
+        <h1 className="font-display text-3xl sm:text-4xl">Farm stay</h1>
         <p className="mt-2 text-sm text-ink-soft">
           Private occupancy notes. Not a public booking page.
         </p>
 
         <div className="mt-6">
-          <CaptureSheet domain="stay" visionEnabled={isVisionConfigured()} redirectTo="/admin/stay" />
+          <CaptureSheet
+            domain="stay"
+            visionEnabled={isVisionConfigured()}
+            redirectTo="/admin/stay"
+            runtime={{
+              ...captureRuntimeFrom(runtime),
+              domains: runtime.domainBySlug.stay
+                ? runtime.domains
+                : [...runtime.domains, domainCatalogBySlug.stay],
+            }}
+          />
         </div>
 
         <h2 className="mt-2 font-display text-2xl">Occupancy</h2>

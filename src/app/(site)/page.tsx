@@ -18,12 +18,12 @@ export default function HomePage() {
           />
           <div className="absolute inset-0 bg-gradient-to-r from-paper via-paper/92 to-paper/55" />
         </div>
-        <div className="relative mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-8 md:grid-cols-[1.15fr_0.85fr] md:py-24">
+        <div className="relative mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-8 md:grid-cols-[1.15fr_0.85fr] md:py-24">
           <div className="rise max-w-xl">
             <p className="font-tamil text-sm font-semibold tracking-wide text-clay">
               சாமான்யம் · grow our own food
             </p>
-            <h1 className="mt-4 font-display text-5xl leading-[0.95] tracking-tight text-ink sm:text-7xl">
+            <h1 className="mt-4 font-display text-4xl leading-[0.95] tracking-tight text-ink sm:text-5xl md:text-7xl">
               A little earth.
               <span className="block text-leaf">A lot of heart.</span>
             </h1>
@@ -32,16 +32,16 @@ export default function HomePage() {
               trees, a vegetable patch, sesame, urad, spinach — and a pond that
               holds the water on this land.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link
                 href="/farm"
-                className="inline-flex h-12 items-center rounded-full bg-leaf-deep px-6 font-semibold text-cream"
+                className="inline-flex h-12 w-full items-center justify-center rounded-full bg-leaf-deep px-6 font-semibold text-cream sm:w-auto"
               >
                 See the farm
               </Link>
               <Link
                 href="/visit"
-                className="inline-flex h-12 items-center rounded-full border border-line px-6 font-semibold text-ink"
+                className="inline-flex h-12 w-full items-center justify-center rounded-full border border-line px-6 font-semibold text-ink sm:w-auto"
               >
                 Visit or enquire
               </Link>
@@ -62,7 +62,7 @@ export default function HomePage() {
       </section>
 
       <section className="border-y border-line bg-cream">
-        <div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-8 md:grid-cols-2">
+        <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-8 md:grid-cols-2 md:py-16">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">The aim</p>
             <h2 className="mt-3 font-display text-4xl tracking-tight sm:text-5xl">
@@ -83,7 +83,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+      <section className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">From the plot</p>
@@ -122,7 +122,7 @@ export default function HomePage() {
       </section>
 
       <section className="bg-leaf-deep text-cream">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 sm:px-8 md:grid-cols-[0.9fr_1.1fr]">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-12 sm:px-8 md:grid-cols-[0.9fr_1.1fr] md:py-16">
           <div className="overflow-hidden rounded-[2rem]">
             <FarmPhoto
               src="/photos/mango-sapling.jpg"
@@ -159,7 +159,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+      <section className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">On the land</p>
         <h2 className="mt-2 font-display text-4xl tracking-tight">From this season</h2>
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -179,7 +179,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-5 pb-16 sm:px-8">
+      <section className="mx-auto max-w-6xl px-5 pb-12 sm:px-8 sm:pb-16">
         <div className="rounded-[2rem] bg-cream px-6 py-12 sm:px-12">
           <p className="font-tamil text-sm font-semibold text-clay">வாருங்கள்</p>
           <h2 className="mt-2 font-display text-4xl tracking-tight sm:text-5xl">
@@ -189,16 +189,16 @@ export default function HomePage() {
             Walk the plot, ask for this week&apos;s produce, or sit by the pond
             when it is full. We farm first, host second.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link
               href="/visit"
-              className="inline-flex h-12 items-center rounded-full bg-clay px-6 font-semibold text-paper"
+              className="inline-flex h-12 w-full items-center justify-center rounded-full bg-clay px-6 font-semibold text-paper sm:w-auto"
             >
               Enquire
             </Link>
             <a
               href={site.phoneHref}
-              className="inline-flex h-12 items-center rounded-full border border-line px-6 font-semibold"
+              className="inline-flex h-12 w-full items-center justify-center rounded-full border border-line px-6 font-semibold sm:w-auto"
             >
               {site.phoneDisplay}
             </a>

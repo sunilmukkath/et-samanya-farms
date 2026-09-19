@@ -1,0 +1,130 @@
+import { listObservations } from "@/db/queries";
+import type { ObservationRow } from "@/db/schema";
+import { domainCatalogBySlug } from "@/lib/packs/domains";
+import { getFarmProfile } from "@/lib/profile";
+import { geminiGenerateJson, geminiGenerateText } from "@/lib/vision";
+
+export type AskHit = {
+  id: string;
+  domain: string;
+  domainLabel: string;
+  occurredAt: string;
+  note: string;
+  photoUrl: string | null;
+};
+
+export type AskResult = {
+  question: string;
+  answer: string;
+  terms: string[];
+  rows: AskHit[];
+};
+
+const EMPTY =
+  "We have not logged that yet. Walk the land, save a note, then ask again.";
+
+function cleanTerm(value: string) {
+  return value.replace(/[%_]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function tokenize(question: string) {
+  return question
+    .split(/[\s,?.!;:]+/)
+    .map(cleanTerm)
+    .filter((term) => term.length >= 2)
+    .slice(0, 8);
+}
+
+function toHit(row: ObservationRow): AskHit {
+  const meta = domainCatalogBySlug[row.domain as keyof typeof domainCatalogBySlug];
+  return {
+    id: row.id,
+    domain: row.domain,
+    domainLabel: meta?.label ?? row.domain,
+    occurredAt: row.occurredAt.toISOString(),
+    note: row.note || summary(row.details as Record<string, unknown> | null),
+    photoUrl: row.photoUrl,
+  };
+}
+
+function summary(details: Record<string, unknown> | null) {
+  if (!details) return "Logged";
+  const bits = Object.entries(details)
+    .filter(([key, value]) => value != null && value !== "" && key !== "aiSuggestion")
+    .map(([key, value]) => `${key}: ${String(value)}`);
+  return bits.join(" · ") || "Logged";
+}
+
+async function searchTerms(terms: string[]) {
+  const unique = [...new Set(terms.map(cleanTerm).filter(Boolean))];
+  const found = new Map<string, ObservationRow>();
+  for (const term of unique.slice(0, 8)) {
+    const rows = await listObservations({ query: term, limit: 16 });
+    for (const row of rows) found.set(row.id, row);
+  }
+  return [...found.values()]
+    .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+    .slice(0, 24);
+}
+
+async function extractTerms(question: string) {
+  const raw = await geminiGenerateJson(
+    `Extract search keywords from a farmer's question about their own field log.
+Return ONLY JSON: {"terms":["..."]} with 3-8 short words.
+Include English and Tamil if either appears. No sentences.
+Question: ${question}`,
+  );
+  if (!raw) return tokenize(question);
+  try {
+    const parsed = JSON.parse(raw) as { terms?: unknown };
+    const terms = Array.isArray(parsed.terms)
+      ? parsed.terms.map((item) => cleanTerm(String(item))).filter(Boolean)
+      : [];
+    return terms.length ? terms : tokenize(question);
+  } catch {
+    return tokenize(question);
+  }
+}
+
+export async function askFarm(questionRaw: string): Promise<AskResult> {
+  const question = cleanTerm(questionRaw).slice(0, 240);
+  if (!question) {
+    return { question: "", answer: "", terms: [], rows: [] };
+  }
+
+  const fallback = tokenize(question);
+  let terms = fallback;
+  const extracted = await extractTerms(question).catch(() => fallback);
+  if (extracted.length) terms = [...new Set([question, ...extracted, ...fallback])].slice(0, 10);
+
+  let rows = await searchTerms(terms);
+  if (!rows.length && question !== fallback[0]) {
+    rows = await searchTerms([question, ...fallback]);
+  }
+
+  const hits = rows.map(toHit);
+  if (!hits.length) {
+    return { question, answer: EMPTY, terms, rows: [] };
+  }
+
+  const profile = await getFarmProfile();
+  const facts = hits.slice(0, 16).map((row) => ({
+    domain: row.domainLabel,
+    when: row.occurredAt,
+    note: row.note,
+  }));
+  const model = await geminiGenerateText(
+    `You answer a farmer at ${profile.name} from THEIR field notes only.
+Question: ${question}
+Facts JSON: ${JSON.stringify(facts)}
+Rules:
+- 2–5 short sentences.
+- If the facts do not contain the answer, reply exactly: ${EMPTY}
+- Do not invent dates, millimetres, kilograms, species, or advice.
+- Prefer the most recent matching notes.
+- Tamil in parentheses is welcome when the notes used Tamil.`,
+  );
+
+  const answer = model?.trim() || `${hits.length} matching note${hits.length === 1 ? "" : "s"} in the log.`;
+  return { question, answer, terms, rows: hits };
+}

@@ -1,6 +1,6 @@
 import { listLedger, listObservationsSince, listTrees } from "@/db/queries";
 import type { ObservationRow } from "@/db/schema";
-import { harvestCrops } from "@/lib/farm";
+import { getFarmProfile } from "@/lib/profile";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -59,7 +59,7 @@ export function yearOverYear(rows: ObservationRow[]) {
     .map(([year, stats]) => ({ year, ...stats }));
 }
 
-export function plantingWindows(rows: ObservationRow[]) {
+export function plantingWindows(rows: ObservationRow[], crops: string[]) {
   const byCrop = new Map<string, number[]>();
   for (const row of rows) {
     if (row.domain !== "plants") continue;
@@ -71,7 +71,7 @@ export function plantingWindows(rows: ObservationRow[]) {
     months.push(row.occurredAt.getMonth());
     byCrop.set(crop, months);
   }
-  return harvestCrops
+  return crops
     .map((crop) => {
       const months = byCrop.get(crop) ?? [];
       if (!months.length) return null;
@@ -105,10 +105,11 @@ export function harvestByCrop(rows: ObservationRow[]) {
 export async function loadSeasonIntelligence() {
   const since = new Date();
   since.setFullYear(since.getFullYear() - 3);
-  const [rows, trees, money] = await Promise.all([
+  const [rows, trees, money, profile] = await Promise.all([
     listObservationsSince(since, 800),
     listTrees(),
     listLedger(120),
+    getFarmProfile(),
   ]);
   const dead = trees.filter((tree) => tree.health === "dead").length;
   const yoy = yearOverYear(rows).map((row) => ({
@@ -120,7 +121,7 @@ export async function loadSeasonIntelligence() {
   return {
     months: seasonBook(rows).slice(-18),
     yoy,
-    windows: plantingWindows(rows),
+    windows: plantingWindows(rows, profile.harvestCrops),
     harvestByCrop: harvestByCrop(rows),
     ledger: { income, expense, net: income - expense },
     treeSurvival: { living: trees.length - dead, dead, pct: trees.length ? Math.round(((trees.length - dead) / trees.length) * 100) : 0 },

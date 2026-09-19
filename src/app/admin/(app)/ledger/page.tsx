@@ -1,17 +1,18 @@
 import { createLedgerAction } from "@/app/admin/actions";
 import { listLedger } from "@/db/queries";
 import { requireOperator } from "@/lib/admin";
-import { ledgerCategories, timeAgo } from "@/lib/farm";
+import { timeAgo } from "@/lib/farm";
+import { getRuntimeFarm } from "@/lib/profile";
 
 export default async function LedgerPage() {
   await requireOperator();
-  const rows = await listLedger();
+  const [rows, runtime] = await Promise.all([listLedger(), getRuntimeFarm()]);
   const income = rows.filter((row) => row.kind === "income").reduce((sum, row) => sum + row.amount, 0);
   const expense = rows.filter((row) => row.kind === "expense").reduce((sum, row) => sum + row.amount, 0);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5">
-      <h1 className="font-display text-4xl">Ledger</h1>
+      <h1 className="font-display text-3xl sm:text-4xl">Ledger</h1>
       <p className="mt-2 text-sm text-ink-soft">
         Enough to see if a crop paid — not GST books. Operators only.
       </p>
@@ -37,7 +38,7 @@ export default async function LedgerPage() {
         <label className="block col-span-2">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-muted">Category</span>
           <select name="category" className="tap w-full rounded-2xl border border-line px-3">
-            {ledgerCategories.map((item) => (
+            {runtime.ledgerCategories.map((item) => (
               <option key={item}>{item}</option>
             ))}
           </select>

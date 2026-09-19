@@ -10,7 +10,9 @@ export function VoiceNote({
   const [listening, setListening] = useState<string | null>(null);
   const supported = typeof window !== "undefined" && "webkitSpeechRecognition" in window;
 
-  if (!supported) return null;
+  if (!supported) {
+    return <p className="text-xs text-muted">Voice needs Chrome or Safari on this phone.</p>;
+  }
 
   function listen(lang: string) {
     const Ctor = (window as unknown as { webkitSpeechRecognition: new () => SpeechRecognition }).webkitSpeechRecognition;
@@ -28,7 +30,7 @@ export function VoiceNote({
   }
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <button
         type="button"
         className="admin-chip"

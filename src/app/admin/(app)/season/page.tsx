@@ -7,7 +7,7 @@ export default async function SeasonPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5">
-      <h1 className="font-display text-4xl">Season book</h1>
+      <h1 className="font-display text-3xl sm:text-4xl">Season book</h1>
       <p className="mt-2 text-sm text-ink-soft">
         Rain, harvest, labour, and stay from your own history — not a generic India calendar.
       </p>

@@ -1,0 +1,25 @@
+# Optional LoRaWAN overlay
+# docker compose -f deploy/compose.yaml -f deploy/compose.chirpstack.yaml --profile lora up
+#
+# ChirpStack needs extra services (postgres already in the base file, plus redis + gateway bridge).
+# Point the ChirpStack MQTT integration at the same Mosquitto broker, then let the edge-agent
+# forward farm/{devEui}/tel/{metric} into Farm OS.
+
+services:
+  redis:
+    profiles: ["lora"]
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  chirpstack:
+    profiles: ["lora"]
+    image: chirpstack/chirpstack:4
+    depends_on:
+      - redis
+      - postgres
+      - mosquitto
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

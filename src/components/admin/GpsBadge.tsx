@@ -40,7 +40,7 @@ export function GpsBadge({ fix, error }: { fix: GpsFix | null; error: string | n
   const tone = !fix ? "text-clay" : accuracy && accuracy > 15 ? "text-sun" : "text-leaf-deep";
 
   return (
-    <p className={`text-xs font-semibold ${tone}`}>
+    <p className={`max-w-[9.5rem] truncate text-[11px] font-semibold ${tone}`}>
       {error ? `GPS: ${error}` : fix ? `GPS ±${accuracy} m` : "Finding GPS…"}
     </p>
   );
