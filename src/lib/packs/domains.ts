@@ -51,8 +51,8 @@ export const catalogDomains: DomainDef[] = [
     hint: "Rain, pond, drip, solar pump",
     fields: [
       { name: "rainMm", label: "Rain mm", type: "number", step: "0.1", inputMode: "decimal", hintFrom: "rainMm", placeholder: "Gauge, not the sky model" },
-      { name: "pondLevel", label: "Pond", type: "chips", optionsFrom: "pondLevels" },
-      { name: "irrigationMinutes", label: "Irrigation min", type: "number", inputMode: "numeric" },
+      { name: "pondLevel", label: "Pond", type: "chips", optionsFrom: "pondLevels", collapsed: true },
+      { name: "irrigationMinutes", label: "Irrigation min", type: "number", inputMode: "numeric", collapsed: true },
       {
         name: "pumpOn",
         label: "Solar pump",
@@ -60,6 +60,7 @@ export const catalogDomains: DomainDef[] = [
         options: ["—", "On", "Off"],
         values: ["", "On", "Off"],
         storeAs: "boolean",
+        collapsed: true,
       },
       {
         name: "tankLevel",
@@ -67,8 +68,9 @@ export const catalogDomains: DomainDef[] = [
         type: "chips",
         options: ["—", "Low", "Ok", "High"],
         values: ["", "Low", "Ok", "High"],
+        collapsed: true,
       },
-      { name: "canalNote", label: "Canal / swale", type: "text", placeholder: "Flow, silt, gate" },
+      { name: "canalNote", label: "Canal / swale", type: "text", placeholder: "Flow, silt, gate", collapsed: true },
     ],
   },
   {

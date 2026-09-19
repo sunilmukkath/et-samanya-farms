@@ -3,6 +3,7 @@ import { ShareBrief } from "@/components/admin/ShareBrief";
 import { canPersistFarmData } from "@/db/queries";
 import { currentBrief } from "@/lib/brief";
 import { timeAgo } from "@/lib/farm";
+import Link from "next/link";
 
 export default async function BriefPage() {
   const persist = canPersistFarmData();
@@ -21,7 +22,10 @@ export default async function BriefPage() {
         </article>
       ) : (
         <p className="mt-5 rounded-3xl border border-line bg-white px-5 py-6 text-sm text-ink-soft">
-          Save a few notes this week, then refresh the brief.
+          Save a few notes this week, then refresh the brief.{" "}
+          <Link href="/admin/log" className="font-semibold text-leaf-deep">
+            Log
+          </Link>
         </p>
       )}
       {brief ? (

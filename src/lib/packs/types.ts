@@ -63,6 +63,7 @@ export type CaptureField = {
   hintFrom?: "rainMm";
   colSpan?: 1 | 2;
   storeAs?: "boolean";
+  collapsed?: boolean;
 };
 
 export type DomainDef = {

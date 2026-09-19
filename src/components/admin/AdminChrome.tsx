@@ -70,12 +70,16 @@ export function AdminTabBar({ tabs }: { tabs: AdminTab[] }) {
 
 function tabIsOn(href: string, path: string) {
   if (href === "/admin") return path === "/admin";
+  if (href === "/admin/log") {
+    return path === "/admin/log" || path.startsWith("/admin/log/") || path.startsWith("/admin/logs");
+  }
   if (href === "/admin/more") {
     return (
       path.startsWith("/admin") &&
       path !== "/admin" &&
       !path.startsWith("/admin/map") &&
-      !path.startsWith("/admin/log")
+      !path.startsWith("/admin/log") &&
+      !path.startsWith("/admin/logs")
     );
   }
   return path === href || path.startsWith(`${href}/`) || path.startsWith(`${href}?`);

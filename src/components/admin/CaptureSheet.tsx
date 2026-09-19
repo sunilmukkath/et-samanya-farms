@@ -39,6 +39,8 @@ export function CaptureSheet({
   runtime,
   plantStandId,
   phiWarning,
+  mode = "full",
+  group,
 }: {
   domain: ObservationDomain;
   treeId?: string;
@@ -52,6 +54,8 @@ export function CaptureSheet({
   runtime: CaptureRuntime;
   plantStandId?: string;
   phiWarning?: string | null;
+  mode?: "note" | "full";
+  group?: string;
 }) {
   const router = useRouter();
   const { fix, error } = useGps();
@@ -62,9 +66,15 @@ export function CaptureSheet({
   const [voiceLang, setVoiceLang] = useState("");
   const [ai, setAi] = useState<AiSuggestion | null>(null);
   const [voiceFill, setVoiceFill] = useState<Record<string, string>>({});
+  const [showCollapsed, setShowCollapsed] = useState(false);
   const meta = runtime.domains.find((item) => item.slug === domain) ?? runtime.domains[0];
   const wantsPhoto = Boolean(meta?.photoDefault);
-  const fields = meta?.fields ?? [];
+  const fields = mode === "note" ? [] : (meta?.fields ?? []);
+  const visibleFields = fields.filter((field) => !field.collapsed || showCollapsed);
+  const collapsedCount = fields.filter((field) => field.collapsed).length;
+  const afterSave =
+    redirectTo ??
+    (treeId ? "/admin/map" : `/admin/log?domain=${domain}${group ? `&group=${group}` : ""}&view=past`);
 
   const hiddenGps = useMemo(
     () => (
@@ -95,7 +105,7 @@ export function CaptureSheet({
             setMessage(result.error);
             return;
           }
-          router.push(redirectTo ?? (treeId ? "/admin/map" : `/admin/logs/${domain}`));
+          router.push(afterSave);
           router.refresh();
         });
       }}
@@ -109,9 +119,13 @@ export function CaptureSheet({
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-tamil text-base text-clay">{meta.tamil}</p>
-          <h1 className="font-display text-3xl leading-tight sm:text-4xl">{meta.label}</h1>
-          <p className="mt-1 text-sm text-ink-soft">{meta.hint} Talk, confirm the chips, then save.</p>
+          <p className="font-tamil text-base text-clay">{mode === "note" ? "குறிப்பு" : meta.tamil}</p>
+          <h1 className="font-display text-3xl leading-tight sm:text-4xl">{mode === "note" ? "Note" : meta.label}</h1>
+          <p className="mt-1 text-sm text-ink-soft">
+            {mode === "note"
+              ? "Photo, voice, or a line of text."
+              : `${meta.hint} Talk, confirm the chips, then save.`}
+          </p>
         </div>
         <span className="rounded-full bg-cream px-3 py-1">
           <GpsBadge fix={fix} error={error} />
@@ -165,7 +179,7 @@ export function CaptureSheet({
         <p className="rounded-[1.25rem] bg-cream px-4 py-3 text-sm leading-relaxed">{phiWarning}</p>
       ) : null}
 
-      {plots.length ? (
+      {mode !== "note" && plots.length ? (
         <Select
           name="plotId"
           label="Plot"
@@ -174,19 +188,31 @@ export function CaptureSheet({
         />
       ) : null}
 
-      <div className={fields.some((field) => field.type === "date") ? "grid grid-cols-2 gap-3" : "space-y-4"}>
-        {fields.map((field) => (
-          <CaptureInput
-            key={`${field.name}:${voiceFill[field.name] ?? ""}`}
-            field={field}
-            runtime={runtime}
-            rainHintMm={rainHintMm}
-            animals={animals}
-            plantStands={plantStands}
-            initialValue={voiceFill[field.name] ?? (field.name === "plantStandId" ? plantStandId : undefined)}
-          />
-        ))}
-      </div>
+      {visibleFields.length ? (
+        <div className={visibleFields.some((field) => field.type === "date") ? "grid grid-cols-2 gap-3" : "space-y-4"}>
+          {visibleFields.map((field) => (
+            <CaptureInput
+              key={`${field.name}:${voiceFill[field.name] ?? ""}`}
+              field={field}
+              runtime={runtime}
+              rainHintMm={rainHintMm}
+              animals={animals}
+              plantStands={plantStands}
+              initialValue={voiceFill[field.name] ?? (field.name === "plantStandId" ? plantStandId : undefined)}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {collapsedCount ? (
+        <button
+          type="button"
+          onClick={() => setShowCollapsed((open) => !open)}
+          className="tap text-sm font-semibold text-leaf-deep"
+        >
+          {showCollapsed ? "Hide extra water" : "More water"}
+        </button>
+      ) : null}
 
       <label className="block">
         <span className={labelClass}>Note</span>
@@ -370,25 +396,3 @@ function Select({
   );
 }
 
-export function DomainPicker({
-  current,
-  domains,
-}: {
-  current?: ObservationDomain;
-  domains: DomainDef[];
-}) {
-  return (
-    <div className="admin-fade-x sticky top-0 z-20 -mx-4 flex gap-2 overflow-x-auto bg-paper/95 px-4 py-2 backdrop-blur">
-      {domains.map((item) => (
-        <a
-          key={item.slug}
-          href={`/admin/log?domain=${item.slug}`}
-          data-on={current === item.slug ? "true" : "false"}
-          className="admin-chip shrink-0"
-        >
-          {item.label}
-        </a>
-      ))}
-    </div>
-  );
-}

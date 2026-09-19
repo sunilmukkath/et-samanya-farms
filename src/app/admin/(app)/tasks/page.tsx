@@ -21,7 +21,11 @@ export default async function TasksPage() {
       <ul className="mt-6 space-y-3">
         {open.length === 0 ? (
           <li className="rounded-3xl border border-line bg-white px-4 py-6 text-sm text-ink-soft">
-            No open tasks. Derive a list after the census and a few domain notes.
+            No open tasks.{" "}
+            <Link href="/admin/log" className="font-semibold text-leaf-deep">
+              Log
+            </Link>{" "}
+            a note, then derive a list.
           </li>
         ) : (
           open.map((task) => (

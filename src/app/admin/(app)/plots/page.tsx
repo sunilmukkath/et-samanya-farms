@@ -38,12 +38,18 @@ export default async function PlotsPage() {
                 {plotKindOptions.find((opt) => opt.value === plot.kind)?.label ?? plot.kind}
                 {plot.polygon ? " · outline on map" : " · name only for now"}
               </p>
-              <div className="mt-2 flex flex-wrap gap-3">
-                <Link href={`/admin/map?walkPlot=${plot.id}`} className="text-sm font-semibold text-leaf-deep">
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href={`/admin/map?walkPlot=${plot.id}`}
+                  className="tap inline-flex items-center justify-center rounded-full bg-leaf-deep px-4 text-sm font-semibold text-cream"
+                >
                   Walk outline
                 </Link>
-                <Link href="/admin/log?domain=plants" className="text-sm text-clay">
-                  Log on a bed
+                <Link
+                  href="/admin/log?domain=plants"
+                  className="tap inline-flex items-center justify-center rounded-full border border-line px-4 text-sm font-semibold"
+                >
+                  Log on this bed
                 </Link>
               </div>
             </li>

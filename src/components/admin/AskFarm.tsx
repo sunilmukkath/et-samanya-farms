@@ -94,7 +94,7 @@ export function AskFarm({
                 {row.domainLabel} · {timeAgo(row.occurredAt)}
               </p>
               <p className="mt-2">{row.note || "Logged"}</p>
-              <Link href={`/admin/logs/${row.domain}`} className="mt-2 inline-block text-sm text-clay">
+              <Link href={`/admin/log?domain=${row.domain}&view=past`} className="mt-2 inline-block text-sm text-clay">
                 Open {row.domainLabel}
               </Link>
             </li>

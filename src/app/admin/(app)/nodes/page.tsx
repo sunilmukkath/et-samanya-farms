@@ -98,13 +98,19 @@ export default async function NodesPage({
               </button>
             </form>
           ) : null}
-          {ota ? (
-            <p className="mt-3 text-sm text-ink-soft">
-              OTA ready: {ota.payload.version} on topic <code>{ota.topic}</code>
+          <details className="mt-3 rounded-2xl bg-cream/60 px-3 py-2">
+            <summary className="tap cursor-pointer text-sm font-semibold">Advanced</summary>
+            {ota ? (
+              <p className="mt-2 text-sm text-ink-soft">
+                OTA ready: {ota.payload.version} on topic <code>{ota.topic}</code>
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-ink-soft">No firmware artifact registered for this kind yet.</p>
+            )}
+            <p className="mt-2 break-all text-xs text-muted">
+              MQTT JSON: {`{"deviceId":"${selected.id}","kind":"${selected.kind}","protocol":"${selected.protocol}"}`}
             </p>
-          ) : (
-            <p className="mt-3 text-sm text-ink-soft">No firmware artifact registered for this kind yet.</p>
-          )}
+          </details>
           <ul className="mt-4 space-y-1 text-sm">
             {history.slice(0, 12).map((row) => (
               <li key={`${row.id}-${row.recordedAt.toISOString()}`}>

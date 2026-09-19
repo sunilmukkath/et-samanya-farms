@@ -1,8 +1,10 @@
-import { CaptureSheet, DomainPicker } from "@/components/admin/CaptureSheet";
-import { OnFarmWater } from "@/components/admin/OnFarmWater";
+import { CaptureSheet } from "@/components/admin/CaptureSheet";
+import { LogHistory } from "@/components/admin/LogHistory";
+import { LogNav } from "@/components/admin/LogNav";
 import { listAnimals, listObservations, listPlantStands, listPlots } from "@/db/queries";
 import { captureRuntimeFrom } from "@/lib/capture";
 import { isObservationDomain, isVisionConfigured } from "@/lib/farm";
+import { defaultDomainForGroup, groupForDomain, isCaptureGroupId } from "@/lib/packs/groups";
 import { phiHolds } from "@/lib/phi";
 import { getRuntimeFarm } from "@/lib/profile";
 import { onFarmWater } from "@/lib/water";
@@ -11,21 +13,43 @@ import { getFarmWeather } from "@/lib/weather";
 export default async function AdminLogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ domain?: string; treeId?: string; source?: string; plantStandId?: string }>;
+  searchParams: Promise<{
+    domain?: string;
+    group?: string;
+    view?: string;
+    treeId?: string;
+    source?: string;
+    plantStandId?: string;
+  }>;
 }) {
   const params = await searchParams;
   const runtime = await getRuntimeFarm();
+  const hasDomainParam = Boolean(params.domain);
   const requested = params.domain ?? "";
-  const domain = isObservationDomain(requested) && runtime.domains.some((item) => item.slug === requested)
-    ? requested
-    : (runtime.domains[0]?.slug ?? "rain");
-  const [weather, plots, animals, plantStands, healthRows, waterRows] = await Promise.all([
+  const domainFromUrl =
+    isObservationDomain(requested) && runtime.domains.some((item) => item.slug === requested) ? requested : null;
+  const requestedGroup = params.group ?? "";
+  const group = isCaptureGroupId(requestedGroup)
+    ? requestedGroup
+    : domainFromUrl
+      ? groupForDomain(domainFromUrl)
+      : "note";
+  const domain =
+    domainFromUrl ??
+    defaultDomainForGroup(group, runtime.domains) ??
+    runtime.domains[0]?.slug ??
+    "rain";
+  const view = params.view === "past" ? "past" : "new";
+  const [weather, plots, animals, plantStands, healthRows, waterRows, history] = await Promise.all([
     getFarmWeather(),
     listPlots(),
     listAnimals(),
     listPlantStands(),
     domain === "harvest" ? listObservations({ domain: "plant_health", limit: 40 }) : Promise.resolve([]),
-    domain === "rain" || domain === "kit" ? listObservations({ limit: 80 }) : Promise.resolve([]),
+    domain === "rain" ? listObservations({ limit: 80 }) : Promise.resolve([]),
+    view === "past"
+      ? listObservations(group === "note" ? { limit: 40 } : { domain, limit: 60 })
+      : Promise.resolve([]),
   ]);
   const holds = phiHolds(healthRows);
   const phiWarning =
@@ -36,23 +60,47 @@ export default async function AdminLogPage({
 
   return (
     <div className="mx-auto max-w-xl px-4 py-5">
-      <DomainPicker current={domain} domains={runtime.domains} />
-      {domain === "rain" || domain === "kit" ? <OnFarmWater water={water} /> : null}
-      <div className="mt-5">
-        <CaptureSheet
-          domain={domain}
-          treeId={params.treeId}
-          plantStandId={params.plantStandId}
-          rainHintMm={weather?.week?.[0]?.rainMm ?? weather?.rainMm}
-          plots={plots}
-          animals={animals}
-          plantStands={plantStands}
-          visionEnabled={isVisionConfigured()}
-          source={params.source}
-          runtime={captureRuntimeFrom(runtime)}
-          phiWarning={phiWarning}
+      <LogNav
+        currentDomain={domain}
+        currentGroup={group}
+        view={view}
+        domains={runtime.domains}
+        hasDomainParam={hasDomainParam}
+      />
+      {view === "new" ? (
+        <div className="mt-5">
+          {domain === "rain" ? (
+            <p className="mb-4 text-sm text-ink-soft">
+              {water.gaugeMm != null
+                ? `Last gauge ${water.gaugeMm} mm. Pond and pump sit under More water.`
+                : "Log the gauge first. Pond, pump, and tank sit under More water."}
+            </p>
+          ) : null}
+          <CaptureSheet
+            key={`${group}:${domain}`}
+            domain={domain}
+            treeId={params.treeId}
+            plantStandId={params.plantStandId}
+            rainHintMm={weather?.week?.[0]?.rainMm ?? weather?.rainMm}
+            plots={plots}
+            animals={animals}
+            plantStands={plantStands}
+            visionEnabled={isVisionConfigured()}
+            source={params.source}
+            runtime={captureRuntimeFrom(runtime)}
+            phiWarning={phiWarning}
+            mode={group === "note" ? "note" : "full"}
+            group={group}
+          />
+        </div>
+      ) : (
+        <LogHistory
+          rows={history}
+          domain={group === "note" ? undefined : domain}
+          farmName={runtime.shortName}
+          mixed={group === "note"}
         />
-      </div>
+      )}
     </div>
   );
 }

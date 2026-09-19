@@ -40,7 +40,7 @@ export default async function AnimalsPage() {
               </p>
               <Link
                 href={`/admin/log?domain=animals`}
-                className="mt-2 inline-block text-sm text-clay"
+                className="tap mt-3 inline-flex items-center justify-center rounded-full bg-leaf-deep px-4 text-sm font-semibold text-cream"
               >
                 Log feed or condition
               </Link>
