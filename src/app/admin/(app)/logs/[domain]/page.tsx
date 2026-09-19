@@ -4,7 +4,7 @@ import { domainBySlug, isObservationDomain, timeAgo } from "@/lib/farm";
 import { getRuntimeFarm } from "@/lib/profile";
 import { listObservations } from "@/db/queries";
 import { phiLabel } from "@/lib/phi";
-import { onFarmWater, waterHasValue } from "@/lib/water";
+import { onFarmWater } from "@/lib/water";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -17,8 +17,11 @@ export default async function DomainLogPage({
   const runtime = await getRuntimeFarm();
   if (!isObservationDomain(domain) || !runtime.domainBySlug[domain]) notFound();
   const meta = runtime.domainBySlug[domain] ?? domainBySlug[domain];
-  const rows = await listObservations({ domain, limit: 60 });
-  const water = domain === "rain" || domain === "kit" ? onFarmWater(rows) : null;
+  const [rows, waterRows] = await Promise.all([
+    listObservations({ domain, limit: 60 }),
+    domain === "rain" || domain === "kit" ? listObservations({ limit: 80 }) : Promise.resolve([]),
+  ]);
+  const water = domain === "rain" || domain === "kit" ? onFarmWater(waterRows) : null;
 
   return (
     <div className="mx-auto max-w-xl px-4 py-5">
@@ -30,7 +33,7 @@ export default async function DomainLogPage({
       >
         Add a note
       </Link>
-      {water && waterHasValue(water) ? <OnFarmWater water={water} /> : null}
+      {water ? <OnFarmWater water={water} /> : null}
 
       <ul className="mt-6 space-y-3">
         {rows.length === 0 ? (

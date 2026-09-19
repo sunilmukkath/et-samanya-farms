@@ -7,12 +7,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Farm log",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#142414",
+  themeColor: "#e8efd4",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

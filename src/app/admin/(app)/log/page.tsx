@@ -5,7 +5,7 @@ import { captureRuntimeFrom } from "@/lib/capture";
 import { isObservationDomain, isVisionConfigured } from "@/lib/farm";
 import { phiHolds } from "@/lib/phi";
 import { getRuntimeFarm } from "@/lib/profile";
-import { onFarmWater, waterHasValue } from "@/lib/water";
+import { onFarmWater } from "@/lib/water";
 import { getFarmWeather } from "@/lib/weather";
 
 export default async function AdminLogPage({
@@ -37,9 +37,7 @@ export default async function AdminLogPage({
   return (
     <div className="mx-auto max-w-xl px-4 py-5">
       <DomainPicker current={domain} domains={runtime.domains} />
-      {domain === "rain" || domain === "kit" ? (
-        waterHasValue(water) ? <OnFarmWater water={water} /> : null
-      ) : null}
+      {domain === "rain" || domain === "kit" ? <OnFarmWater water={water} /> : null}
       <div className="mt-5">
         <CaptureSheet
           domain={domain}

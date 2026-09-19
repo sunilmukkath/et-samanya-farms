@@ -1,12 +1,17 @@
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open("samanya-farm-v1").then((cache) => cache.addAll(["/admin", "/admin-manifest.webmanifest"])),
+    caches.open("samanya-farm-v2").then((cache) => cache.addAll(["/admin", "/admin-manifest.webmanifest"])),
   );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== "samanya-farm-v2").map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
@@ -19,7 +24,7 @@ self.addEventListener("fetch", (event) => {
     fetch(request)
       .then((response) => {
         const copy = response.clone();
-        caches.open("samanya-farm-v1").then((cache) => cache.put(request, copy));
+        caches.open("samanya-farm-v2").then((cache) => cache.put(request, copy));
         return response;
       })
       .catch(() => caches.match(request).then((cached) => cached || caches.match("/admin"))),
