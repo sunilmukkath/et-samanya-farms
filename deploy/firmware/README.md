@@ -1,5 +1,7 @@
 # Companion firmware (ESP32 / LoRa) — not part of the Next.js app.
 
+Shopping list and placement: [`deploy/hardware/README.md`](../hardware/README.md). Pair nodes in Farm OS → Nodes.
+
 India radio: 865–867 MHz LoRa.
 
 HTTP node (simplest first pond/soil node):

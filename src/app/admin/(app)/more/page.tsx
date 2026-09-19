@@ -12,8 +12,9 @@ const catalog = [
   { href: "/admin/stands", label: "Beds / crop cycles", hint: "Horticulture stands", module: "stands" as const },
   { href: "/admin/animals", label: "Animals", hint: "Herd as entities", module: "animals" as const },
   { href: "/admin/nodes", label: "Nodes", hint: "Sensors, live values, OTA", module: "nodes" as const },
+  { href: "/admin/hardware", label: "4-acre kit", hint: "Phones first, then pond, soil, pump, rain", module: null },
   { href: "/admin/ledger", label: "Ledger", hint: "Seed, labour, produce — operators", module: "ledger" as const },
-  { href: "/admin/setup", label: "Farm setup", hint: "Packs, biome, map pin", module: null },
+  { href: "/admin/setup", label: "Farm setup", hint: "Packs, map pin, first node", module: null },
 ];
 
 export default async function AdminMorePage() {

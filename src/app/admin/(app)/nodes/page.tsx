@@ -1,4 +1,5 @@
 import { acknowledgeAlertAction, commandDeviceAction } from "@/app/admin/actions";
+import Link from "next/link";
 import { DeviceCreateForm } from "@/components/admin/DeviceCreateForm";
 import { listAlerts, listDevices, listPlots, latestReadings, listReadings } from "@/db/queries";
 import { timeAgo } from "@/lib/farm";
@@ -24,7 +25,10 @@ export default async function NodesPage({
     <div className="mx-auto max-w-3xl px-4 py-5">
       <h1 className="font-display text-3xl sm:text-4xl">Nodes</h1>
       <p className="mt-2 text-sm text-ink-soft">
-        Register a sensor, bind it to a plot, and watch live readings. Commands only go to pumps/valves with a fresh heartbeat.
+        Register a sensor, bind it to a plot, and watch live readings. Commands only go to pumps/valves with a fresh heartbeat.{" "}
+        <Link href="/admin/hardware" className="font-semibold text-leaf-deep underline decoration-sun underline-offset-4">
+          4-acre kit
+        </Link>
       </p>
 
       <div className="mt-5">

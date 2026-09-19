@@ -1,4 +1,5 @@
 import { canPersistFarmData, dashboardStats, emptyDashboardStats, latestReadings, listAlerts, listDevices, listObservations, listTasks } from "@/db/queries";
+import { redirect } from "next/navigation";
 import { currentRole } from "@/lib/admin";
 import { currentBrief } from "@/lib/brief";
 import { OnFarmWater } from "@/components/admin/OnFarmWater";
@@ -14,6 +15,7 @@ export default async function AdminHomePage() {
   const persist = canPersistFarmData();
   const role = await currentRole();
   const runtime = await getRuntimeFarm();
+  if (!runtime.onboardedAt) redirect("/admin/setup");
   const stats = persist ? await dashboardStats() : emptyDashboardStats();
   const weather = await getFarmWeather();
   const watch = (stats.healthCounts.watch ?? 0) + (stats.healthCounts.stressed ?? 0);

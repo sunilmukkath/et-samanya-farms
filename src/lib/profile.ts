@@ -32,9 +32,19 @@ export async function getFarmProfile(): Promise<FarmProfile> {
   } catch {
     stored = null;
   }
-  const value = stored ?? seedFarmProfile();
+  const value = normalizeProfile(stored ?? seedFarmProfile());
   cache = { at: Date.now(), value };
   return value;
+}
+
+function normalizeProfile(value: FarmProfile): FarmProfile {
+  return {
+    ...value,
+    units: value.units === "imperial" ? "imperial" : "metric",
+    animalCensusTarget: value.animalCensusTarget ?? null,
+    bedCensusTarget: value.bedCensusTarget ?? null,
+    treeCensusTarget: value.treeCensusTarget ?? null,
+  };
 }
 
 export async function getRuntimeFarm(): Promise<RuntimeFarm> {
