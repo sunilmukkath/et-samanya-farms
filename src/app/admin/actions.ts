@@ -47,7 +47,7 @@ import { isObservationDomain, plotKindOptions } from "@/lib/farm";
 import { hashDeviceToken, mintDeviceToken } from "@/lib/iot/tokens";
 import { actuationAllowed, recordActuation } from "@/lib/iot/ota";
 import { isPackId } from "@/lib/packs/resolve";
-import type { PackId } from "@/lib/packs/types";
+import type { FarmProfile, PackId } from "@/lib/packs/types";
 import { biomeById } from "@/lib/profiles/biomes";
 import { clearFarmProfileCache, getFarmProfile, getRuntimeFarm } from "@/lib/profile";
 import { uploadPhoto } from "@/lib/photos";
@@ -576,7 +576,7 @@ export async function saveFarmSetupAction(formData: FormData) {
   const lat = num(formData, "lat") ?? current.location.lat;
   const lng = num(formData, "lng") ?? current.location.lng;
   const applyBiome = str(formData, "applyBiome") === "1";
-  const next = {
+  const next: FarmProfile = {
     ...current,
     name: str(formData, "name") || current.name,
     shortName: str(formData, "shortName") || current.shortName,
