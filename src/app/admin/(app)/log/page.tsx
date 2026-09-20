@@ -8,7 +8,7 @@ import { defaultDomainForGroup, groupForDomain, isCaptureGroupId } from "@/lib/p
 import { phiHolds } from "@/lib/phi";
 import { getRuntimeFarm } from "@/lib/profile";
 import { onFarmWater } from "@/lib/water";
-import { getFarmWeather } from "@/lib/weather";
+import { getFarmWeather, todayRainMm } from "@/lib/weather";
 
 export default async function AdminLogPage({
   searchParams,
@@ -81,7 +81,7 @@ export default async function AdminLogPage({
             domain={domain}
             treeId={params.treeId}
             plantStandId={params.plantStandId}
-            rainHintMm={weather?.week?.[0]?.rainMm ?? weather?.rainMm}
+            rainHintMm={todayRainMm(weather)}
             plots={plots}
             animals={animals}
             plantStands={plantStands}

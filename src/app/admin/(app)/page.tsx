@@ -3,10 +3,11 @@ import { formatInr } from "@/lib/accounts";
 import { redirect } from "next/navigation";
 import { currentRole } from "@/lib/admin";
 import { OnFarmWater } from "@/components/admin/OnFarmWater";
+import { WeatherStrip } from "@/components/admin/WeatherStrip";
 import { phiHolds, phiLabel } from "@/lib/phi";
 import { getRuntimeFarm } from "@/lib/profile";
 import { onFarmWater } from "@/lib/water";
-import { getFarmWeather, weatherLabel } from "@/lib/weather";
+import { getFarmWeather, todayRainMm, weatherLabel } from "@/lib/weather";
 import Link from "next/link";
 
 export default async function AdminHomePage() {
@@ -17,6 +18,7 @@ export default async function AdminHomePage() {
   const stats = persist ? await dashboardStats() : emptyDashboardStats();
   const books = persist && role === "operator" ? await booksSnapshot() : null;
   const weather = await getFarmWeather();
+  const rainToday = todayRainMm(weather);
   const watch = (stats.healthCounts.watch ?? 0) + (stats.healthCounts.stressed ?? 0);
   const tasks = persist ? await listTasks(false) : [];
   const devices = persist ? await listDevices() : [];
@@ -45,7 +47,7 @@ export default async function AdminHomePage() {
           <p className="mt-2 text-base text-sand">{weatherLabel(weather?.code)}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="rounded-full bg-cream/15 px-3 py-1 text-sm">
-              {weather?.weekRainMm != null ? `${weather.weekRainMm.toFixed(1)} mm rain` : "Weather pause"}
+              {rainToday != null ? `${rainToday.toFixed(1)} mm rain today` : "Weather pause"}
             </span>
             {stats.rainMmWeek ? (
               <span className="rounded-full bg-cream/15 px-3 py-1 text-sm">gauge {stats.rainMmWeek.toFixed(1)} mm</span>
@@ -54,6 +56,7 @@ export default async function AdminHomePage() {
               {weather?.humidity ?? "—"}% humidity
             </span>
           </div>
+          {weather?.week.length ? <WeatherStrip days={weather.week} todayDate={weather.todayDate} /> : null}
         </section>
 
         <OnFarmWater water={water} />
