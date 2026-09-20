@@ -117,7 +117,7 @@ export function CaptureSheet({
 
   return (
     <form
-      className="space-y-5 pb-24"
+      className="space-y-5 pb-6"
       action={(formData) => {
         setMessage(null);
         start(async () => {
@@ -282,7 +282,7 @@ export function CaptureSheet({
 
       {message ? <p className="text-sm font-semibold text-clay">{message}</p> : null}
 
-      <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-paper px-4 py-3">
+      <div className="pt-2">
         <div className="flex gap-2">
           {step > 0 ? (
             <button
@@ -399,7 +399,7 @@ function ChipField({
     <div>
       <p className={labelClass}>{label}</p>
       <input type="hidden" name={name} value={value} />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 pb-2">
         {options.map((option, i) => {
           const next = values?.[i] ?? option;
           return (

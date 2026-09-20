@@ -57,6 +57,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-IN"
+      data-scroll-behavior="smooth"
       className={`${display.variable} ${body.variable} ${tamil.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-paper text-ink">{children}</body>

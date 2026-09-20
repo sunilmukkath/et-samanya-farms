@@ -79,7 +79,7 @@ export function BooksCapture({
   }
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4 pb-6">
       <FlowSteps current={step + 1} total={steps.length} label={steps[step]} />
 
       <section className={step === 0 ? "space-y-4" : "hidden"}>
@@ -367,7 +367,7 @@ export function BooksCapture({
         {message ? <p className="text-sm font-semibold text-clay">{message}</p> : null}
 
         {!(captureFirst && step === 1) ? (
-          <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-paper px-4 py-3">
+          <div className="pt-2">
             <div className="flex gap-2">
               {step > 0 ? (
                 <button type="button" className="tap flex-1 rounded-full border border-line font-semibold" onClick={() => setStep((value) => Math.max(0, value - 1))}>

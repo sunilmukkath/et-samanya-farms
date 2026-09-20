@@ -67,13 +67,13 @@ export function LogNav({
   return (
     <div>
       <div className="sticky top-0 z-20 -mx-4 bg-paper/95 px-4 py-2 backdrop-blur">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-1.5">
           {groups.map((group) => (
             <a
               key={group.id}
               href={href({ group: group.id, domain: defaultDomainForGroup(group.id, domains, currentDomain) ?? undefined, view: "new" })}
               data-on={currentGroup === group.id ? "true" : "false"}
-              className="admin-chip justify-center px-3 text-center"
+              className="admin-chip min-h-10 justify-center px-2 text-sm"
             >
               {group.label}
             </a>
@@ -81,7 +81,7 @@ export function LogNav({
         </div>
       </div>
       {showSubs && active?.domains.length ? (
-        <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {active.domains.map((slug) => {
             const meta = domains.find((item) => item.slug === slug);
             return (
@@ -89,7 +89,7 @@ export function LogNav({
                 key={slug}
                 href={href({ group: currentGroup, domain: slug })}
                 data-on={currentDomain === slug ? "true" : "false"}
-                className="admin-chip justify-center text-center"
+                className="admin-chip min-h-10 justify-center px-3 text-sm"
               >
                 {meta?.label ?? slug}
               </a>
@@ -97,18 +97,18 @@ export function LogNav({
           })}
         </div>
       ) : null}
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
         <a
           href={href({ view: "new" })}
           data-on={view === "new" ? "true" : "false"}
-          className="admin-chip tap flex items-center justify-center"
+          className="admin-chip tap flex min-h-10 items-center justify-center text-sm"
         >
           New
         </a>
         <a
           href={href({ view: "past" })}
           data-on={view === "past" ? "true" : "false"}
-          className="admin-chip tap flex items-center justify-center"
+          className="admin-chip tap flex min-h-10 items-center justify-center text-sm"
         >
           Past
         </a>
