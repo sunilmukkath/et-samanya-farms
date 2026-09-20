@@ -36,6 +36,23 @@ const filePath = path.join(process.cwd(), ".data", "farm.json");
 
 let cache: FarmFile | null = null;
 let chain: Promise<unknown> = Promise.resolve();
+let loading: Promise<FarmFile> | null = null;
+
+async function loadFromDisk(): Promise<FarmFile> {
+  try {
+    const raw = await readFile(filePath, "utf8");
+    const parsed = JSON.parse(raw) as Partial<FarmFile>;
+    cache = revive(parsed);
+    if (!parsed.bookAccounts?.length || !parsed.bookSettings) {
+      await persist(cache);
+    }
+    return cache;
+  } catch {
+    cache = seed();
+    await persist(cache);
+    return cache;
+  }
+}
 
 function seedAccounts(now: Date): BookAccountRow[] {
   return chartOfAccounts.map((row) => ({
@@ -138,19 +155,8 @@ function seed(): FarmFile {
 
 async function read(): Promise<FarmFile> {
   if (cache) return cache;
-  try {
-    const raw = await readFile(filePath, "utf8");
-    const parsed = JSON.parse(raw) as Partial<FarmFile>;
-    cache = revive(parsed);
-    if (!parsed.bookAccounts?.length || !parsed.bookSettings) {
-      await persist(cache);
-    }
-    return cache;
-  } catch {
-    cache = seed();
-    await persist(cache);
-    return cache;
-  }
+  loading ??= loadFromDisk();
+  return loading;
 }
 
 async function persist(data: FarmFile) {
