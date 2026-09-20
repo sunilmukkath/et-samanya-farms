@@ -25,13 +25,15 @@ type CaptureMode = "manual" | "photo" | "sms";
 
 export function BooksCapture({
   defaultKind = "expense",
+  defaultMode = "manual",
   visionOn,
 }: {
   defaultKind?: VoucherKind;
+  defaultMode?: CaptureMode;
   visionOn: boolean;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<CaptureMode>("manual");
+  const [mode, setMode] = useState<CaptureMode>(defaultMode);
   const [kind, setKind] = useState<VoucherKind>(defaultKind);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("upi");
   const [pending, start] = useTransition();
@@ -107,16 +109,22 @@ export function BooksCapture({
         >
           <p className="text-sm text-ink-soft">
             Photograph the shop bill. Gemini reads vendor, amount, GSTIN and GST. Then you confirm.
-            {!visionOn ? " Set GEMINI_API_KEY to turn reading on." : ""}
+            {!visionOn
+              ? " Vision is off — attach the photo in the form below, type the amount, and post. Set GEMINI_API_KEY to auto-read bills."
+              : ""}
           </p>
-          <input name="photo" type="file" accept="image/*" capture="environment" required className={fieldClass} />
-          <button
-            type="submit"
-            disabled={pending || !visionOn}
-            className="tap w-full rounded-full bg-leaf-deep text-sm font-semibold text-cream disabled:opacity-60"
-          >
-            {pending ? "Reading…" : "Read this bill"}
-          </button>
+          {visionOn ? (
+            <>
+              <input name="photo" type="file" accept="image/*" capture="environment" required className={fieldClass} />
+              <button
+                type="submit"
+                disabled={pending}
+                className="tap w-full rounded-full bg-leaf-deep text-sm font-semibold text-cream disabled:opacity-60"
+              >
+                {pending ? "Reading…" : "Read this bill"}
+              </button>
+            </>
+          ) : null}
         </form>
       ) : null}
 
@@ -324,12 +332,16 @@ export function BooksCapture({
           <textarea name="narration" rows={2} className={`${fieldClass} py-3`} value={narration} onChange={(e) => setNarration(e.target.value)} />
         </label>
 
-        {mode === "manual" && !photoUrl ? (
+        {photoUrl ? (
+          <p className="text-xs text-leaf-deep">Bill photo attached. Check the figures, then post.</p>
+        ) : (
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-muted">Attach bill (optional)</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+              Attach bill {mode === "photo" ? "" : "(optional)"}
+            </span>
             <input name="photo" type="file" accept="image/*" capture="environment" className={fieldClass} />
           </label>
-        ) : null}
+        )}
 
         {confidence ? <p className="text-xs text-leaf-deep">{confidence}. Check the figures, then post.</p> : null}
         {message ? <p className="text-sm font-semibold text-clay">{message}</p> : null}

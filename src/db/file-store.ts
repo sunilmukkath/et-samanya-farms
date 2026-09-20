@@ -140,7 +140,11 @@ async function read(): Promise<FarmFile> {
   if (cache) return cache;
   try {
     const raw = await readFile(filePath, "utf8");
-    cache = revive(JSON.parse(raw) as Partial<FarmFile>);
+    const parsed = JSON.parse(raw) as Partial<FarmFile>;
+    cache = revive(parsed);
+    if (!parsed.bookAccounts?.length || !parsed.bookSettings) {
+      await persist(cache);
+    }
     return cache;
   } catch {
     cache = seed();

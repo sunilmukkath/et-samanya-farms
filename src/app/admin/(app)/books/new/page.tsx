@@ -10,7 +10,7 @@ export default async function NewVoucherPage({
 }) {
   const params = await searchParams;
   const kind = params.kind === "income" || params.kind === "transfer" ? params.kind : "expense";
-  const via = params.via;
+  const via = params.via === "sms" || params.via === "photo" ? params.via : "manual";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5">
@@ -23,11 +23,8 @@ export default async function NewVoucherPage({
         paste a bank SMS — then check and post. Every post is a balanced voucher.
       </p>
       <div className="mt-5">
-        <BooksCapture defaultKind={kind} visionOn={isVisionConfigured()} />
+        <BooksCapture defaultKind={kind} defaultMode={via} visionOn={isVisionConfigured()} />
       </div>
-      {via === "sms" ? (
-        <p className="mt-4 text-xs text-muted">Open the Bank SMS chip if the paste box is not showing.</p>
-      ) : null}
     </div>
   );
 }
