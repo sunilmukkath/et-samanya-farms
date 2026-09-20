@@ -1,4 +1,5 @@
-import { index, integer, jsonb, pgTable, real, text, timestamp } from "drizzle-orm/pg-core";
+import type { AccountType, GstKind, PaymentMode, VoucherKind, VoucherSource } from "@/lib/accounts";
+import { index, integer, jsonb, pgTable, real, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const observationDomains = [
   "trees",
@@ -341,3 +342,95 @@ export type DeviceRow = typeof devices.$inferSelect;
 export type ReadingRow = typeof readings.$inferSelect;
 export type AlertRow = typeof alerts.$inferSelect;
 export type FirmwareRow = typeof firmwareArtifacts.$inferSelect;
+
+export const bookAccounts = pgTable(
+  "book_accounts",
+  {
+    id: text("id").primaryKey(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    tamil: text("tamil"),
+    type: text("type").$type<AccountType>().notNull(),
+    groupName: text("group_name"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [uniqueIndex("book_accounts_code_idx").on(t.code)],
+);
+
+export const bookParties = pgTable("book_parties", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  kind: text("kind").notNull(),
+  gstin: text("gstin"),
+  pan: text("pan"),
+  phone: text("phone"),
+  upi: text("upi"),
+  place: text("place"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+});
+
+export const bookVouchers = pgTable(
+  "book_vouchers",
+  {
+    id: text("id").primaryKey(),
+    number: text("number").notNull(),
+    kind: text("kind").$type<VoucherKind>().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" }).notNull(),
+    fy: text("fy").notNull(),
+    partyId: text("party_id"),
+    partyName: text("party_name"),
+    narration: text("narration"),
+    grossPaise: integer("gross_paise").notNull(),
+    taxablePaise: integer("taxable_paise").notNull(),
+    gstRate: integer("gst_rate").notNull(),
+    gstKind: text("gst_kind").$type<GstKind>().notNull(),
+    cgstPaise: integer("cgst_paise").notNull(),
+    sgstPaise: integer("sgst_paise").notNull(),
+    igstPaise: integer("igst_paise").notNull(),
+    paymentMode: text("payment_mode").$type<PaymentMode>().notNull(),
+    categoryAccountId: text("category_account_id").notNull(),
+    walletAccountId: text("wallet_account_id").notNull(),
+    transferToId: text("transfer_to_id"),
+    photoUrl: text("photo_url"),
+    smsRaw: text("sms_raw"),
+    smsHash: text("sms_hash"),
+    source: text("source").$type<VoucherSource>().notNull(),
+    gstin: text("gstin"),
+    invoiceNo: text("invoice_no"),
+    hsn: text("hsn"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [
+    index("book_vouchers_occurred_idx").on(t.occurredAt),
+    index("book_vouchers_fy_idx").on(t.fy),
+    index("book_vouchers_sms_hash_idx").on(t.smsHash),
+  ],
+);
+
+export const bookLines = pgTable(
+  "book_lines",
+  {
+    id: text("id").primaryKey(),
+    voucherId: text("voucher_id").notNull(),
+    accountId: text("account_id").notNull(),
+    debitPaise: integer("debit_paise").notNull(),
+    creditPaise: integer("credit_paise").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [index("book_lines_voucher_idx").on(t.voucherId), index("book_lines_account_idx").on(t.accountId)],
+);
+
+export const bookSettings = pgTable("book_settings", {
+  id: text("id").primaryKey(),
+  gstin: text("gstin"),
+  pan: text("pan"),
+  smsToken: text("sms_token").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+});
+
+export type BookAccountRow = typeof bookAccounts.$inferSelect;
+export type BookPartyRow = typeof bookParties.$inferSelect;
+export type BookVoucherRow = typeof bookVouchers.$inferSelect;
+export type BookLineRow = typeof bookLines.$inferSelect;
+export type BookSettingsRow = typeof bookSettings.$inferSelect;

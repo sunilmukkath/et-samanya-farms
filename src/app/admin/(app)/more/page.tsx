@@ -19,7 +19,7 @@ const thisFarm: MoreLink[] = [
 const setup: MoreLink[] = [
   { href: "/admin/nodes", label: "Nodes", hint: "Pair sensors and watch live values", module: "nodes" as const },
   { href: "/admin/hardware", label: "4-acre kit", hint: "Phones first, then pond, soil, pump, rain", module: null },
-  { href: "/admin/ledger", label: "Ledger", hint: "Seed, labour, produce", module: "ledger" as const },
+  { href: "/admin/books", label: "Books", hint: "GST, bills, bank SMS — Indian FY", module: "ledger" as const },
   { href: "/admin/setup", label: "Farm setup", hint: "Name, packs, map pin, first node", module: null },
 ];
 
@@ -29,7 +29,7 @@ export default async function AdminMorePage() {
 
   function shown(links: MoreLink[]) {
     return links.filter((link) => {
-      if (link.href === "/admin/ledger" && role === "staff") return false;
+      if ((link.href === "/admin/ledger" || link.href === "/admin/books") && role === "staff") return false;
       if (link.module && !runtime.modules.includes(link.module)) return false;
       return true;
     });

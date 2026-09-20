@@ -1,4 +1,5 @@
-import { canPersistFarmData, dashboardStats, emptyDashboardStats, latestReadings, listAlerts, listDevices, listObservations, listTasks } from "@/db/queries";
+import { booksSnapshot, canPersistFarmData, dashboardStats, emptyDashboardStats, latestReadings, listAlerts, listDevices, listObservations, listTasks } from "@/db/queries";
+import { formatInr } from "@/lib/accounts";
 import { redirect } from "next/navigation";
 import { currentRole } from "@/lib/admin";
 import { OnFarmWater } from "@/components/admin/OnFarmWater";
@@ -14,6 +15,7 @@ export default async function AdminHomePage() {
   const runtime = await getRuntimeFarm();
   if (!runtime.onboardedAt) redirect("/admin/setup");
   const stats = persist ? await dashboardStats() : emptyDashboardStats();
+  const books = persist && role === "operator" ? await booksSnapshot() : null;
   const weather = await getFarmWeather();
   const watch = (stats.healthCounts.watch ?? 0) + (stats.healthCounts.stressed ?? 0);
   const tasks = persist ? await listTasks(false) : [];
@@ -93,6 +95,18 @@ export default async function AdminHomePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Work list</p>
             <p className="mt-1 font-display text-2xl">{tasks.length} open</p>
             <p className="text-sm text-ink-soft">{tasks[0]?.title}</p>
+          </Link>
+        ) : null}
+
+        {books ? (
+          <Link href="/admin/books" className="mt-4 block rounded-[1.75rem] bg-white px-5 py-4 shadow-[var(--shadow)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Books · {books.fy.label}</p>
+            <p className="mt-1 font-display text-2xl">{formatInr((books.monthIn ?? 0) - (books.monthOut ?? 0))}</p>
+            <p className="text-sm text-ink-soft">
+              {books.vouchers.length
+                ? `In ${formatInr(books.monthIn)} · Out ${formatInr(books.monthOut)} this month`
+                : "Photograph a bill or paste a bank SMS."}
+            </p>
           </Link>
         ) : null}
 

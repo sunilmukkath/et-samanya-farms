@@ -1,14 +1,16 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@/db/schema";
+import { chartOfAccounts } from "@/lib/accounts";
 import { seedFarmProfile } from "@/lib/farm.config";
+import { mintDeviceToken } from "@/lib/iot/tokens";
 
 type Database = ReturnType<typeof drizzle<typeof schema>>;
 
 const globalForDb = globalThis as unknown as {
   farmSql?: ReturnType<typeof postgres>;
   farmDb?: Database;
-  farmDbReady?: boolean;
+  farmDbReady?: boolean | number;
 };
 
 export function isDatabaseConfigured() {
@@ -42,7 +44,7 @@ export function getDb() {
 
 export async function ensureSchema() {
   if (!process.env.DATABASE_URL) return;
-  if (globalForDb.farmDbReady) return;
+  if (globalForDb.farmDbReady === 3) return;
   const sql = getSql();
 
   await sql`CREATE TABLE IF NOT EXISTS species_catalog (
@@ -284,5 +286,95 @@ export async function ensureSchema() {
     });
   }
 
-  globalForDb.farmDbReady = true;
+  await sql`CREATE TABLE IF NOT EXISTS book_accounts (
+    id text PRIMARY KEY,
+    code text NOT NULL UNIQUE,
+    name text NOT NULL,
+    tamil text,
+    type text NOT NULL,
+    group_name text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS book_parties (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    kind text NOT NULL,
+    gstin text,
+    pan text,
+    phone text,
+    upi text,
+    place text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS book_vouchers (
+    id text PRIMARY KEY,
+    number text NOT NULL,
+    kind text NOT NULL,
+    occurred_at timestamptz NOT NULL DEFAULT now(),
+    fy text NOT NULL,
+    party_id text,
+    party_name text,
+    narration text,
+    gross_paise integer NOT NULL,
+    taxable_paise integer NOT NULL,
+    gst_rate integer NOT NULL DEFAULT 0,
+    gst_kind text NOT NULL,
+    cgst_paise integer NOT NULL DEFAULT 0,
+    sgst_paise integer NOT NULL DEFAULT 0,
+    igst_paise integer NOT NULL DEFAULT 0,
+    payment_mode text NOT NULL,
+    category_account_id text NOT NULL,
+    wallet_account_id text NOT NULL,
+    transfer_to_id text,
+    photo_url text,
+    sms_raw text,
+    sms_hash text,
+    source text NOT NULL,
+    gstin text,
+    invoice_no text,
+    hsn text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS book_vouchers_occurred_idx ON book_vouchers (occurred_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS book_vouchers_fy_idx ON book_vouchers (fy)`;
+  await sql`CREATE INDEX IF NOT EXISTS book_vouchers_sms_hash_idx ON book_vouchers (sms_hash)`;
+
+  await sql`CREATE TABLE IF NOT EXISTS book_lines (
+    id text PRIMARY KEY,
+    voucher_id text NOT NULL,
+    account_id text NOT NULL,
+    debit_paise integer NOT NULL DEFAULT 0,
+    credit_paise integer NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS book_lines_voucher_idx ON book_lines (voucher_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS book_lines_account_idx ON book_lines (account_id)`;
+
+  await sql`CREATE TABLE IF NOT EXISTS book_settings (
+    id text PRIMARY KEY,
+    gstin text,
+    pan text,
+    sms_token text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`;
+
+  const existingAccounts = await sql`SELECT count(*)::int AS count FROM book_accounts`;
+  if (!existingAccounts[0]?.count) {
+    for (const row of chartOfAccounts) {
+      await sql`INSERT INTO book_accounts (id, code, name, tamil, type, group_name, created_at)
+        VALUES (${row.id}, ${row.code}, ${row.name}, ${row.tamil}, ${row.type}, ${row.group}, now())
+        ON CONFLICT (id) DO NOTHING`;
+    }
+  }
+
+  const existingSettings = await sql`SELECT count(*)::int AS count FROM book_settings`;
+  if (!existingSettings[0]?.count) {
+    await sql`INSERT INTO book_settings (id, gstin, pan, sms_token, created_at, updated_at)
+      VALUES (${"farm"}, NULL, NULL, ${mintDeviceToken()}, now(), now())`;
+  }
+
+  globalForDb.farmDbReady = 3;
 }
