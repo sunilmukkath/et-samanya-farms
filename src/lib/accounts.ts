@@ -133,7 +133,11 @@ export function financialYear(date: Date = new Date()): FinancialYear {
 export function parseIstDate(value: string | null | undefined, fallback = new Date()) {
   if (!value) return fallback;
   const iso = /^\d{4}-\d{2}-\d{2}$/.exec(value.trim());
-  if (iso) return new Date(`${value.trim()}T12:00:00+05:30`);
+  if (iso) {
+    const day = value.trim();
+    if (day === istInputDate(fallback)) return fallback;
+    return new Date(`${day}T12:00:00+05:30`);
+  }
   const dmy = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/.exec(value.trim());
   if (dmy) {
     const day = dmy[1].padStart(2, "0");

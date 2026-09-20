@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   BookAccountRow,
@@ -34,23 +34,38 @@ type FarmFile = {
 
 const filePath = path.join(process.cwd(), ".data", "farm.json");
 
-let cache: FarmFile | null = null;
-let chain: Promise<unknown> = Promise.resolve();
-let loading: Promise<FarmFile> | null = null;
+type StoreState = {
+  cache: FarmFile | null;
+  chain: Promise<unknown>;
+  loading: Promise<FarmFile> | null;
+  mtimeMs: number;
+};
+
+const g = globalThis as typeof globalThis & { __etSamanyaFarmStore?: StoreState };
+if (!g.__etSamanyaFarmStore) {
+  g.__etSamanyaFarmStore = { cache: null, chain: Promise.resolve(), loading: null, mtimeMs: 0 };
+}
+const store = g.__etSamanyaFarmStore;
+
+async function stamp() {
+  store.mtimeMs = (await stat(filePath)).mtimeMs;
+}
 
 async function loadFromDisk(): Promise<FarmFile> {
   try {
     const raw = await readFile(filePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<FarmFile>;
-    cache = revive(parsed);
+    store.cache = revive(parsed);
     if (!parsed.bookAccounts?.length || !parsed.bookSettings) {
-      await persist(cache);
+      await persist(store.cache);
+    } else {
+      await stamp();
     }
-    return cache;
+    return store.cache;
   } catch {
-    cache = seed();
-    await persist(cache);
-    return cache;
+    store.cache = seed();
+    await persist(store.cache);
+    return store.cache;
   }
 }
 
@@ -154,25 +169,34 @@ function seed(): FarmFile {
 }
 
 async function read(): Promise<FarmFile> {
-  if (cache) return cache;
-  loading ??= loadFromDisk();
-  return loading;
+  try {
+    const info = await stat(filePath);
+    if (store.cache && info.mtimeMs === store.mtimeMs) return store.cache;
+    store.cache = null;
+    store.loading = null;
+  } catch {
+    store.cache = null;
+    store.loading = null;
+  }
+  store.loading ??= loadFromDisk();
+  return store.loading;
 }
 
 async function persist(data: FarmFile) {
-  cache = data;
+  store.cache = data;
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, JSON.stringify(data));
+  await stamp();
 }
 
 function mutate<T>(fn: (data: FarmFile) => T | Promise<T>) {
-  const run = chain.then(async () => {
+  const run = store.chain.then(async () => {
     const data = await read();
     const result = await fn(data);
     await persist(data);
     return result;
   });
-  chain = run.then(
+  store.chain = run.then(
     () => undefined,
     () => undefined,
   );
