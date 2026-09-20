@@ -1,7 +1,6 @@
 import { signOut } from "@/auth";
 import { requireAdmin } from "@/lib/admin";
 import Link from "next/link";
-import { site } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +20,9 @@ export default async function AdminAppLayout({ children }: { children: React.Rea
           </Link>
           <Link href="/admin/kit" className="tap inline-flex items-center rounded-full px-3 text-sm font-semibold text-cream">
             Kit
+          </Link>
+          <Link href="/admin/books" className="tap inline-flex items-center rounded-full px-3 text-sm font-semibold text-cream">
+            Books
           </Link>
           <Link href="/admin/log" className="tap inline-flex items-center rounded-full bg-leaf px-4 text-sm font-semibold text-leaf-deep">
             Log
@@ -46,14 +48,14 @@ export default async function AdminAppLayout({ children }: { children: React.Rea
           <Link href="/admin/map" className="tap py-3 hover:text-cream">
             Trees
           </Link>
+          <Link href="/admin/books" className="tap py-3 hover:text-cream">
+            Books
+          </Link>
           <Link href="/admin/kit" className="tap py-3 hover:text-cream">
             Kit
           </Link>
           <Link href="/admin/log" className="tap py-3 hover:text-cream">
             Note
-          </Link>
-          <Link href="/" className="tap py-3 hover:text-cream">
-            {site.shortName}
           </Link>
         </div>
       </nav>

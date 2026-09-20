@@ -1,4 +1,5 @@
-import { canPersistFarmData, dashboardStats, emptyDashboardStats, isDatabaseConfigured, listDevices } from "@/db/queries";
+import { booksSnapshot, canPersistFarmData, dashboardStats, emptyDashboardStats, isDatabaseConfigured, listDevices } from "@/db/queries";
+import { formatInr } from "@/lib/accounts";
 import { liveStatus, metricLine } from "@/lib/equipment";
 import { domains, timeAgo, treeCensusTarget } from "@/lib/farm";
 import { getFarmWeather, weatherLabel } from "@/lib/weather";
@@ -9,6 +10,7 @@ export default async function AdminHomePage() {
   const neon = isDatabaseConfigured();
   const stats = persist ? await dashboardStats() : emptyDashboardStats();
   const devices = persist ? await listDevices() : [];
+  const books = persist ? await booksSnapshot() : null;
   const weather = await getFarmWeather();
   const watch = (stats.healthCounts.watch ?? 0) + (stats.healthCounts.stressed ?? 0);
   const onlineKit = devices.filter((row) => liveStatus(row) === "online");
@@ -52,6 +54,24 @@ export default async function AdminHomePage() {
         </div>
         <span className="tap inline-flex items-center rounded-full bg-leaf px-4 text-sm font-semibold text-leaf-deep">
           Map
+        </span>
+      </Link>
+
+      <Link
+        href="/admin/books"
+        className="mt-4 flex items-center justify-between rounded-3xl border border-line bg-white px-5 py-4"
+      >
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Books · {books?.fy.label ?? "FY"}</p>
+          <p className="font-display text-3xl">{formatInr((books?.monthIn ?? 0) - (books?.monthOut ?? 0))}</p>
+          <p className="text-sm text-ink-soft">
+            {books?.vouchers.length
+              ? `In ${formatInr(books.monthIn)} · Out ${formatInr(books.monthOut)} this month`
+              : "Expenses, income, GST. Photograph a bill or paste a bank SMS."}
+          </p>
+        </div>
+        <span className="tap inline-flex items-center rounded-full bg-leaf px-4 text-sm font-semibold text-leaf-deep">
+          Open
         </span>
       </Link>
 

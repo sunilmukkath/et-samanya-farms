@@ -2,12 +2,22 @@ import { desc, eq, gte, sql } from "drizzle-orm";
 import { fileStore } from "@/db/file-store";
 import { ensureSchema, getDb, isDatabaseConfigured } from "@/db/index";
 import {
+  bookAccounts,
+  bookLines,
+  bookParties,
+  bookSettings,
+  bookVouchers,
   deviceReadings,
   farmDevices,
   farmZones,
   observations,
   speciesCatalog,
   trees,
+  type BookAccountRow,
+  type BookLineRow,
+  type BookPartyRow,
+  type BookSettingsRow,
+  type BookVoucherRow,
   type DeviceRow,
   type GeoPolygon,
   type ObservationDomain,
@@ -19,6 +29,18 @@ import {
   type ZoneRow,
 } from "@/db/schema";
 import { nearestPoints } from "@/lib/geo";
+import {
+  accountById,
+  buildLedgerLines,
+  financialYear,
+  gstBreakup,
+  nextVoucherNo,
+  type GstKind,
+  type PaymentMode,
+  type VoucherKind,
+  type VoucherSource,
+} from "@/lib/accounts";
+import { newDeviceToken } from "@/lib/equipment";
 
 export { isDatabaseConfigured };
 
@@ -328,4 +350,278 @@ export function emptyDashboardStats() {
     healthCounts: {} as Partial<Record<TreeHealth, number>>,
     speciesCounts: [] as { species: string; count: number }[],
   };
+}
+
+export async function listBookAccounts(): Promise<BookAccountRow[]> {
+  if (usingFileStore()) return fileStore.listBookAccounts();
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  return client.select().from(bookAccounts).orderBy(bookAccounts.code);
+}
+
+export async function getBookSettings(): Promise<BookSettingsRow | null> {
+  if (usingFileStore()) return fileStore.getBookSettings();
+  if (!isDatabaseConfigured()) return null;
+  const client = await db();
+  const rows = await client.select().from(bookSettings).limit(1);
+  if (rows[0]) return rows[0];
+  const now = new Date();
+  const row: BookSettingsRow = {
+    id: "farm",
+    gstin: null,
+    pan: null,
+    smsToken: newDeviceToken(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await client.insert(bookSettings).values(row);
+  return row;
+}
+
+export async function saveBookSettings(patch: Partial<BookSettingsRow>) {
+  if (usingFileStore()) return fileStore.saveBookSettings(patch);
+  const current = await getBookSettings();
+  if (!current) return;
+  const next = { ...current, ...patch, updatedAt: new Date() };
+  const client = await db();
+  await client.update(bookSettings).set(next).where(eq(bookSettings.id, current.id));
+  return next;
+}
+
+export async function listParties(): Promise<BookPartyRow[]> {
+  if (usingFileStore()) return fileStore.listParties();
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  return client.select().from(bookParties).orderBy(bookParties.name);
+}
+
+export async function upsertParty(name: string, extra?: Partial<BookPartyRow>) {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  if (usingFileStore()) {
+    return fileStore.upsertParty({
+      id: crypto.randomUUID(),
+      name: trimmed,
+      kind: extra?.kind ?? "vendor",
+      gstin: extra?.gstin ?? null,
+      pan: extra?.pan ?? null,
+      phone: extra?.phone ?? null,
+      upi: extra?.upi ?? null,
+      place: extra?.place ?? null,
+      createdAt: new Date(),
+    });
+  }
+  const client = await db();
+  const existing = await client.select().from(bookParties);
+  const found = existing.find((row) => row.name.toLowerCase() === trimmed.toLowerCase());
+  if (found) return found;
+  const row: BookPartyRow = {
+    id: crypto.randomUUID(),
+    name: trimmed,
+    kind: extra?.kind ?? "vendor",
+    gstin: extra?.gstin ?? null,
+    pan: extra?.pan ?? null,
+    phone: extra?.phone ?? null,
+    upi: extra?.upi ?? null,
+    place: extra?.place ?? null,
+    createdAt: new Date(),
+  };
+  await client.insert(bookParties).values(row);
+  return row;
+}
+
+export async function listVouchers(
+  opts: { fy?: string; kind?: string; limit?: number } = {},
+): Promise<BookVoucherRow[]> {
+  if (usingFileStore()) return fileStore.listVouchers(opts);
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  const limit = opts.limit ?? 80;
+  const rows = await client.select().from(bookVouchers).orderBy(desc(bookVouchers.occurredAt)).limit(400);
+  return rows
+    .filter((row) => (opts.fy ? row.fy === opts.fy : true) && (opts.kind ? row.kind === opts.kind : true))
+    .slice(0, limit);
+}
+
+export async function getVoucher(id: string) {
+  if (usingFileStore()) return fileStore.getVoucher(id);
+  if (!isDatabaseConfigured()) return null;
+  const client = await db();
+  const rows = await client.select().from(bookVouchers).where(eq(bookVouchers.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getVoucherBySmsHash(hash: string) {
+  if (usingFileStore()) return fileStore.getVoucherBySmsHash(hash);
+  if (!isDatabaseConfigured()) return null;
+  const client = await db();
+  const rows = await client.select().from(bookVouchers).where(eq(bookVouchers.smsHash, hash)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listLines(
+  opts: { voucherId?: string; accountId?: string; limit?: number } = {},
+): Promise<BookLineRow[]> {
+  if (usingFileStore()) return fileStore.listLines(opts);
+  if (!isDatabaseConfigured()) return [];
+  const client = await db();
+  const limit = opts.limit ?? 200;
+  if (opts.voucherId) {
+    return client.select().from(bookLines).where(eq(bookLines.voucherId, opts.voucherId)).limit(limit);
+  }
+  if (opts.accountId) {
+    return client.select().from(bookLines).where(eq(bookLines.accountId, opts.accountId)).limit(limit);
+  }
+  return client.select().from(bookLines).limit(limit);
+}
+
+export async function deleteVoucher(id: string) {
+  if (usingFileStore()) return fileStore.deleteVoucher(id);
+  const client = await db();
+  await client.delete(bookLines).where(eq(bookLines.voucherId, id));
+  await client.delete(bookVouchers).where(eq(bookVouchers.id, id));
+}
+
+export type NewBookVoucher = {
+  kind: VoucherKind;
+  occurredAt: Date;
+  partyName?: string | null;
+  narration?: string | null;
+  amountPaise: number;
+  gstRate?: number;
+  gstKind?: GstKind;
+  gstInclusive?: boolean;
+  paymentMode: PaymentMode;
+  categoryAccountId: string;
+  walletAccountId: string;
+  transferToId?: string | null;
+  photoUrl?: string | null;
+  smsRaw?: string | null;
+  smsHash?: string | null;
+  source: VoucherSource;
+  gstin?: string | null;
+  invoiceNo?: string | null;
+  hsn?: string | null;
+};
+
+export async function insertBookVoucher(input: NewBookVoucher) {
+  if (input.amountPaise <= 0) throw new Error("Amount must be more than zero.");
+  const fy = financialYear(input.occurredAt);
+  const existing = await listVouchers({ fy: fy.label, limit: 500 });
+  const gst = gstBreakup({
+    amountPaise: input.amountPaise,
+    rate: input.gstRate ?? 0,
+    kind: input.gstKind ?? "none",
+    inclusive: input.gstInclusive,
+  });
+  const linesDraft = buildLedgerLines({
+    kind: input.kind,
+    grossPaise: gst.grossPaise,
+    gst,
+    categoryAccountId: input.categoryAccountId,
+    walletAccountId: input.walletAccountId,
+    transferToId: input.transferToId,
+  });
+  const party = input.partyName ? await upsertParty(input.partyName) : null;
+  const now = new Date();
+  const voucher: BookVoucherRow = {
+    id: crypto.randomUUID(),
+    number: nextVoucherNo(
+      existing.map((row) => row.number),
+      fy,
+    ),
+    kind: input.kind,
+    occurredAt: input.occurredAt,
+    fy: fy.label,
+    partyId: party?.id ?? null,
+    partyName: party?.name ?? input.partyName ?? null,
+    narration: input.narration ?? null,
+    grossPaise: gst.grossPaise,
+    taxablePaise: gst.taxablePaise,
+    gstRate: input.gstRate ?? 0,
+    gstKind: input.gstKind ?? "none",
+    cgstPaise: gst.cgstPaise,
+    sgstPaise: gst.sgstPaise,
+    igstPaise: gst.igstPaise,
+    paymentMode: input.paymentMode,
+    categoryAccountId: input.categoryAccountId,
+    walletAccountId: input.walletAccountId,
+    transferToId: input.transferToId ?? null,
+    photoUrl: input.photoUrl ?? null,
+    smsRaw: input.smsRaw ?? null,
+    smsHash: input.smsHash ?? null,
+    source: input.source,
+    gstin: input.gstin ?? null,
+    invoiceNo: input.invoiceNo ?? null,
+    hsn: input.hsn ?? null,
+    createdAt: now,
+  };
+  const lines: BookLineRow[] = linesDraft.map((line) => ({
+    id: crypto.randomUUID(),
+    voucherId: voucher.id,
+    accountId: line.accountId,
+    debitPaise: line.debitPaise,
+    creditPaise: line.creditPaise,
+    createdAt: now,
+  }));
+  if (usingFileStore()) return fileStore.insertVoucher(voucher, lines);
+  const client = await db();
+  await client.insert(bookVouchers).values(voucher);
+  if (lines.length) await client.insert(bookLines).values(lines);
+  return voucher;
+}
+
+export async function booksSnapshot(fyLabel?: string) {
+  const fy = fyLabel ? financialYear(new Date(`${fyLabel.slice(0, 4)}-08-01T12:00:00+05:30`)) : financialYear();
+  const vouchers = await listVouchers({ fy: fy.label, limit: 500 });
+  const lines = await listLines({ limit: 4000 });
+  const ids = new Set(vouchers.map((row) => row.id));
+  const fyLines = lines.filter((row) => ids.has(row.voucherId));
+  const balances: Record<string, number> = {};
+  for (const line of fyLines) {
+    balances[line.accountId] = (balances[line.accountId] ?? 0) + line.debitPaise - line.creditPaise;
+  }
+  const income = chartIncome(balances);
+  const expense = chartExpense(balances);
+  const monthKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit" }).format(
+    new Date(),
+  );
+  const thisMonth = vouchers.filter((row) => istYearMonth(row.occurredAt) === monthKey);
+  const monthIn = thisMonth.filter((row) => row.kind === "income").reduce((sum, row) => sum + row.grossPaise, 0);
+  const monthOut = thisMonth.filter((row) => row.kind === "expense").reduce((sum, row) => sum + row.grossPaise, 0);
+  return {
+    fy,
+    vouchers,
+    balances,
+    cash: balances.cash ?? 0,
+    bank: balances.bank ?? 0,
+    upi: balances.upi ?? 0,
+    income,
+    expense,
+    profit: income - expense,
+    monthIn,
+    monthOut,
+    inputGst: (balances.input_cgst ?? 0) + (balances.input_sgst ?? 0) + (balances.input_igst ?? 0),
+    outputGst: -((balances.output_cgst ?? 0) + (balances.output_sgst ?? 0) + (balances.output_igst ?? 0)),
+  };
+}
+
+function chartIncome(balances: Record<string, number>) {
+  let sum = 0;
+  for (const [id, value] of Object.entries(balances)) {
+    if (accountById[id]?.type === "income") sum += -value;
+  }
+  return sum;
+}
+
+function chartExpense(balances: Record<string, number>) {
+  let sum = 0;
+  for (const [id, value] of Object.entries(balances)) {
+    if (accountById[id]?.type === "expense") sum += value;
+  }
+  return sum;
+}
+
+function istYearMonth(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit" }).format(date);
 }
