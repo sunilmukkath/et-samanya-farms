@@ -1,7 +1,10 @@
-import { canPersistFarmData, dashboardStats, emptyDashboardStats, latestReadings, listAlerts, listDevices, listObservations, listTasks } from "@/db/queries";
+import { booksSnapshot, canPersistFarmData, dashboardStats, emptyDashboardStats, latestReadings, listAlerts, listDevices, listObservations, listPlots, listTasks, listVouchers } from "@/db/queries";
 import { redirect } from "next/navigation";
 import { currentRole } from "@/lib/admin";
+import { FirstWalk } from "@/components/admin/FirstWalk";
 import { OnFarmWater } from "@/components/admin/OnFarmWater";
+import { firstWalk } from "@/lib/onboarding";
+import { formatInr } from "@/lib/accounts";
 import { phiHolds, phiLabel } from "@/lib/phi";
 import { getRuntimeFarm } from "@/lib/profile";
 import { onFarmWater } from "@/lib/water";
@@ -21,6 +24,16 @@ export default async function AdminHomePage() {
   const readings = persist && devices.length ? await latestReadings() : [];
   const alerts = persist ? await listAlerts(false) : [];
   const recent = persist ? await listObservations({ limit: 80 }) : [];
+  const plots = persist ? await listPlots() : [];
+  const vouchers = persist && role !== "staff" ? await listVouchers({ limit: 5 }) : [];
+  const books = persist && role !== "staff" ? await booksSnapshot() : null;
+  const walk = firstWalk({
+    onboarded: Boolean(runtime.onboardedAt),
+    plotCount: plots.length,
+    noteCount: recent.length,
+    voucherCount: vouchers.length,
+    showBooks: role !== "staff",
+  });
   const water = onFarmWater(recent);
   const holds = phiHolds(recent);
   const noisyNodes = devices.filter((device) => device.status === "stale" || device.status === "error");
@@ -32,6 +45,8 @@ export default async function AdminHomePage() {
         <p className="mb-3 font-tamil text-sm text-muted">
           {role === "staff" ? "பணியாளர்" : runtime.location.village || runtime.shortName} · field notebook
         </p>
+
+        <FirstWalk steps={walk} />
 
         <section className="rounded-[1.75rem] bg-leaf-deep px-5 py-5 text-cream">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sun">
@@ -96,12 +111,35 @@ export default async function AdminHomePage() {
           </Link>
         ) : null}
 
-        <Link
-          href="/admin/log"
-          className="tap mt-6 flex items-center justify-center rounded-full bg-leaf-deep text-lg font-semibold text-cream"
-        >
-          Log
-        </Link>
+        {role !== "staff" && books ? (
+          <Link href="/admin/books" className="mt-4 block rounded-[1.75rem] bg-white px-5 py-4 shadow-[var(--shadow)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Accounts books</p>
+            <p className="mt-1 font-display text-2xl">
+              {formatInr(books.monthIn - books.monthOut)}
+              <span className="ml-2 font-sans text-sm font-normal text-muted">this month</span>
+            </p>
+            <p className="text-sm text-ink-soft">
+              In {formatInr(books.monthIn)} · out {formatInr(books.monthOut)}. Open the day book.
+            </p>
+          </Link>
+        ) : null}
+
+        <div className={`mt-6 grid gap-2 ${role !== "staff" ? "grid-cols-2" : "grid-cols-1"}`}>
+          <Link
+            href="/admin/log"
+            className="tap flex items-center justify-center rounded-full bg-leaf-deep text-base font-semibold text-cream"
+          >
+            Log
+          </Link>
+          {role !== "staff" ? (
+            <Link
+              href="/admin/books/new"
+              className="tap flex items-center justify-center rounded-full border border-line bg-white text-base font-semibold"
+            >
+              Books
+            </Link>
+          ) : null}
+        </div>
       </div>
     </div>
   );

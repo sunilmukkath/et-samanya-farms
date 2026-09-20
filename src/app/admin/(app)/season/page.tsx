@@ -95,11 +95,14 @@ export default async function SeasonPage() {
       </section>
 
       <section className="mt-4 rounded-3xl border border-line bg-white px-5 py-5">
-        <h2 className="font-display text-2xl">Lightweight ledger</h2>
+        <h2 className="font-display text-2xl">Accounts books</h2>
         <p className="mt-2 text-sm text-ink-soft">
           In ₹{data.ledger.income.toFixed(0)} · out ₹{data.ledger.expense.toFixed(0)} · net ₹
           {data.ledger.net.toFixed(0)}
         </p>
+        <a href="/admin/books" className="mt-3 inline-block text-sm font-semibold text-leaf-deep">
+          Open the day book
+        </a>
       </section>
     </div>
   );

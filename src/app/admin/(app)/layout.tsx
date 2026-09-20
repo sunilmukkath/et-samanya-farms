@@ -6,13 +6,17 @@ import { getRuntimeFarm } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
-function tabsFor(): AdminTab[] {
-  return [
+function tabsFor(role: "operator" | "staff" | null): AdminTab[] {
+  const tabs: AdminTab[] = [
     { href: "/admin", label: "Home", icon: "home" },
     { href: "/admin/map", label: "Map", icon: "map" },
     { href: "/admin/log", label: "Log", icon: "log" },
-    { href: "/admin/more", label: "More", icon: "more" },
   ];
+  if (role !== "staff") {
+    tabs.push({ href: "/admin/books", label: "Books", icon: "books" });
+  }
+  tabs.push({ href: "/admin/more", label: "More", icon: "more" });
+  return tabs;
 }
 
 export default async function AdminAppLayout({ children }: { children: React.ReactNode }) {
@@ -33,10 +37,10 @@ export default async function AdminAppLayout({ children }: { children: React.Rea
         signOut={signOutAction}
       />
       <PwaRegister />
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-paper text-ink">
+      <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-paper text-ink">
         {children}
       </div>
-      <AdminTabBar tabs={tabsFor()} />
+      <AdminTabBar tabs={tabsFor(role)} />
     </div>
   );
 }

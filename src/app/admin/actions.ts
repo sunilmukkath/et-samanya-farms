@@ -64,6 +64,7 @@ function revalidateAdmin() {
   revalidatePath("/admin/search");
   revalidatePath("/admin/season");
   revalidatePath("/admin/ledger");
+  revalidatePath("/admin/books");
   revalidatePath("/admin/plots");
   revalidatePath("/admin/animals");
   revalidatePath("/admin/nodes");

@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 export type AdminTab = {
   href: string;
   label: string;
-  icon: "home" | "map" | "log" | "more";
+  icon: "home" | "map" | "log" | "books" | "more";
 };
 
 export function AdminHeader({
@@ -23,8 +23,8 @@ export function AdminHeader({
     <header className="admin-no-print z-30 shrink-0 border-b border-white/10 bg-leaf-deep pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex h-12 max-w-xl items-center gap-2 px-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
         <Link href="/admin" className="flex min-w-0 flex-1 items-center gap-2">
-          <BrandLockup variant="white" className="h-7" />
-          <p className="truncate font-display text-base leading-none text-cream">
+          <BrandLockup variant="white" className="hidden h-6 sm:block" />
+          <p className="truncate font-display text-lg leading-none text-cream sm:text-base">
             {farmName ?? "Farm log"}
             {roleLabel ? (
               <span className="ml-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.16em] text-sun">
@@ -34,7 +34,7 @@ export function AdminHeader({
           </p>
         </Link>
         <form action={signOut}>
-          <button type="submit" className="tap min-w-12 px-2 text-xs font-semibold text-cream">
+          <button type="submit" className="tap min-w-12 shrink-0 px-2 text-xs font-semibold text-cream">
             Sign out
           </button>
         </form>
@@ -45,10 +45,11 @@ export function AdminHeader({
 
 export function AdminTabBar({ tabs }: { tabs: AdminTab[] }) {
   const path = usePathname();
+  const cols = tabs.length >= 5 ? "grid-cols-5" : "grid-cols-4";
 
   return (
     <nav className="admin-no-print z-30 shrink-0 border-t border-white/10 bg-leaf-deep pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-      <div className="mx-auto grid max-w-xl grid-cols-4 text-center">
+      <div className={`mx-auto grid max-w-xl text-center ${cols}`}>
         {tabs.map((tab) => {
           const on = tabIsOn(tab.href, path);
           return (
@@ -56,7 +57,7 @@ export function AdminTabBar({ tabs }: { tabs: AdminTab[] }) {
               key={tab.href}
               href={tab.href}
               data-on={on ? "true" : "false"}
-              className="admin-tab tap flex-col gap-0.5 px-1 py-1.5 text-[11px] font-semibold leading-none"
+              className="admin-tab tap flex-col gap-0.5 px-0.5 py-1.5 text-[10px] font-semibold leading-none sm:text-[11px]"
             >
               <TabGlyph name={tab.icon} />
               {tab.label}
@@ -73,13 +74,18 @@ function tabIsOn(href: string, path: string) {
   if (href === "/admin/log") {
     return path === "/admin/log" || path.startsWith("/admin/log/") || path.startsWith("/admin/logs");
   }
+  if (href === "/admin/books") {
+    return path === "/admin/books" || path.startsWith("/admin/books/") || path.startsWith("/admin/ledger");
+  }
   if (href === "/admin/more") {
     return (
       path.startsWith("/admin") &&
       path !== "/admin" &&
       !path.startsWith("/admin/map") &&
       !path.startsWith("/admin/log") &&
-      !path.startsWith("/admin/logs")
+      !path.startsWith("/admin/logs") &&
+      !path.startsWith("/admin/books") &&
+      !path.startsWith("/admin/ledger")
     );
   }
   return path === href || path.startsWith(`${href}/`) || path.startsWith(`${href}?`);
@@ -107,6 +113,15 @@ function TabGlyph({ name }: { name: AdminTab["icon"] }) {
       <svg viewBox="0 0 24 24" className={common} fill="none" aria-hidden>
         <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
         <path d="M12 8v8M8 12h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === "books") {
+    return (
+      <svg viewBox="0 0 24 24" className={common} fill="none" aria-hidden>
+        <path d="M5 4.5h11.5A2.5 2.5 0 0 1 19 7v12.5H7.5A2.5 2.5 0 0 0 5 22V4.5Z" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M9 8h6M9 12h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     );
   }
