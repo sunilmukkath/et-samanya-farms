@@ -1,6 +1,7 @@
 "use client";
 
 import { createObservationAction, suggestTreeVisionAction, suggestVoiceLogAction } from "@/app/admin/actions";
+import { FlowSteps } from "@/components/admin/FlowSteps";
 import { GpsBadge, useGps } from "@/components/admin/GpsBadge";
 import { VoiceNote } from "@/components/admin/VoiceNote";
 import type { AiSuggestion, AnimalRow, ObservationDomain, PlantStandRow, PlotRow } from "@/db/schema";
@@ -10,8 +11,7 @@ import { enqueueObservation } from "@/lib/offline-queue";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-const fieldClass =
-  "tap w-full rounded-2xl border border-line bg-white px-3 text-base text-ink";
+const fieldClass = "tap w-full rounded-2xl border border-line bg-white px-3 text-base text-ink";
 
 const labelClass = "mb-1.5 block text-sm font-semibold text-ink-soft";
 
@@ -25,6 +25,8 @@ export type CaptureRuntime = Pick<
   | "pondLevels"
   | "defaultAnimalKind"
 > & { domains: DomainDef[] };
+
+type StepId = "photo" | "plot" | "extra" | "note" | "review" | `field:${string}`;
 
 export function CaptureSheet({
   domain,
@@ -66,15 +68,30 @@ export function CaptureSheet({
   const [voiceLang, setVoiceLang] = useState("");
   const [ai, setAi] = useState<AiSuggestion | null>(null);
   const [voiceFill, setVoiceFill] = useState<Record<string, string>>({});
-  const [showCollapsed, setShowCollapsed] = useState(false);
+  const [step, setStep] = useState(0);
   const meta = runtime.domains.find((item) => item.slug === domain) ?? runtime.domains[0];
   const wantsPhoto = Boolean(meta?.photoDefault);
   const fields = mode === "note" ? [] : (meta?.fields ?? []);
-  const visibleFields = fields.filter((field) => !field.collapsed || showCollapsed);
-  const collapsedCount = fields.filter((field) => field.collapsed).length;
+  const primaryFields = fields.filter((field) => !field.collapsed);
+  const extraFields = fields.filter((field) => field.collapsed);
   const afterSave =
     redirectTo ??
     (treeId ? "/admin/map" : `/admin/log?domain=${domain}${group ? `&group=${group}` : ""}&view=past`);
+
+  const steps = useMemo(() => {
+    const list: { id: StepId; title: string; optional?: boolean }[] = [
+      { id: "photo", title: "Photo", optional: !wantsPhoto },
+    ];
+    if (mode !== "note" && plots.length) list.push({ id: "plot", title: "Plot", optional: true });
+    for (const field of primaryFields) list.push({ id: `field:${field.name}`, title: field.label });
+    if (extraFields.length) list.push({ id: "extra", title: "More water", optional: true });
+    list.push({ id: "note", title: "Note", optional: true });
+    list.push({ id: "review", title: "Save" });
+    return list;
+  }, [extraFields.length, mode, plots.length, primaryFields, wantsPhoto]);
+
+  const current = steps[step] ?? steps[0];
+  const last = step >= steps.length - 1;
 
   const hiddenGps = useMemo(
     () => (
@@ -89,9 +106,18 @@ export function CaptureSheet({
 
   if (!meta) return null;
 
+  function goNext() {
+    if (current.id === "photo" && wantsPhoto && !preview) {
+      setMessage("Take a photo first.");
+      return;
+    }
+    setMessage(null);
+    setStep((value) => Math.min(value + 1, steps.length - 1));
+  }
+
   return (
     <form
-      className="space-y-5 pb-2"
+      className="space-y-5 pb-24"
       action={(formData) => {
         setMessage(null);
         start(async () => {
@@ -109,6 +135,12 @@ export function CaptureSheet({
           router.refresh();
         });
       }}
+      onSubmit={(event) => {
+        if (!last) {
+          event.preventDefault();
+          goNext();
+        }
+      }}
     >
       <input type="hidden" name="domain" value={domain} />
       {treeId ? <input type="hidden" name="treeId" value={treeId} /> : null}
@@ -118,81 +150,84 @@ export function CaptureSheet({
       {hiddenGps}
 
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="font-tamil text-base text-clay">{mode === "note" ? "குறிப்பு" : meta.tamil}</p>
           <h1 className="font-display text-3xl leading-tight sm:text-4xl">{mode === "note" ? "Note" : meta.label}</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            {mode === "note"
-              ? "Photo, voice, or a line of text."
-              : `${meta.hint} Talk, confirm the chips, then save.`}
+            {mode === "note" ? "Photo, voice, or a line of text — one step at a time." : `${meta.hint}. One question, then the next.`}
           </p>
         </div>
-        <span className="rounded-full bg-cream px-3 py-1">
+        <span className="shrink-0 rounded-full bg-cream px-3 py-1">
           <GpsBadge fix={fix} error={error} />
         </span>
       </div>
 
-      <label className="admin-camera">
-        <input
-          name="photo"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          required={wantsPhoto}
-          className="sr-only"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (preview) URL.revokeObjectURL(preview);
-            setPreview(file ? URL.createObjectURL(file) : null);
-            if (!file || !visionEnabled) return;
-            const fd = new FormData();
-            fd.set("photo", file);
-            fd.set("domain", domain);
-            start(async () => {
-              const result = await suggestTreeVisionAction(fd);
-              if (result.ok) setAi(result.suggestion);
-            });
-          }}
-        />
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="" />
-        ) : (
-          <span className="px-4 text-center text-base font-semibold text-ink-soft">
-            {wantsPhoto ? "Tap to take a photo" : "Photo (optional)"}
-          </span>
-        )}
-      </label>
-
-      {ai ? (
-        <p className="rounded-[1.25rem] bg-cream px-4 py-3 text-sm leading-relaxed">
-          AI suggests <strong>{ai.species}</strong>
-          {ai.issue ? ` · ${ai.issue}` : ""}
-          {ai.culturalControl ? `. Try: ${ai.culturalControl}` : ""}
-          {ai.compostMaturity ? ` · heap ${ai.compostMaturity}` : ""}
-          {ai.cattleCondition ? ` · ${ai.cattleCondition}` : ""}
-          . Confirm below — nothing is saved until you tap save.
-        </p>
-      ) : null}
+      <FlowSteps current={step + 1} total={steps.length} label={current.title} />
 
       {phiWarning ? (
         <p className="rounded-[1.25rem] bg-cream px-4 py-3 text-sm leading-relaxed">{phiWarning}</p>
       ) : null}
 
+      <section className={current.id === "photo" ? "space-y-3" : "hidden"}>
+        <label className="admin-camera">
+          <input
+            name="photo"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            required={wantsPhoto}
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (preview) URL.revokeObjectURL(preview);
+              setPreview(file ? URL.createObjectURL(file) : null);
+              if (!file || !visionEnabled) return;
+              const fd = new FormData();
+              fd.set("photo", file);
+              fd.set("domain", domain);
+              start(async () => {
+                const result = await suggestTreeVisionAction(fd);
+                if (result.ok) setAi(result.suggestion);
+              });
+            }}
+          />
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="" />
+          ) : (
+            <span className="px-4 text-center text-base font-semibold text-ink-soft">
+              {wantsPhoto ? "Tap to take a photo" : "Photo (optional)"}
+            </span>
+          )}
+        </label>
+        {ai ? (
+          <p className="rounded-[1.25rem] bg-cream px-4 py-3 text-sm leading-relaxed">
+            AI suggests <strong>{ai.species}</strong>
+            {ai.issue ? ` · ${ai.issue}` : ""}
+            {ai.culturalControl ? `. Try: ${ai.culturalControl}` : ""}
+            {ai.compostMaturity ? ` · heap ${ai.compostMaturity}` : ""}
+            {ai.cattleCondition ? ` · ${ai.cattleCondition}` : ""}
+            . Confirm on the next screens — nothing is saved until you tap save.
+          </p>
+        ) : null}
+      </section>
+
       {mode !== "note" && plots.length ? (
-        <Select
-          name="plotId"
-          label="Plot"
-          options={["", ...plots.map((plot) => plot.name)]}
-          values={["", ...plots.map((plot) => plot.id)]}
-        />
+        <section className={current.id === "plot" ? "" : "hidden"}>
+          <Select
+            name="plotId"
+            label="Plot"
+            options={["", ...plots.map((plot) => plot.name)]}
+            values={["", ...plots.map((plot) => plot.id)]}
+          />
+        </section>
       ) : null}
 
-      {visibleFields.length ? (
-        <div className={visibleFields.some((field) => field.type === "date") ? "grid grid-cols-2 gap-3" : "space-y-4"}>
-          {visibleFields.map((field) => (
+      {fields.map((field) => {
+        const on = current.id === `field:${field.name}` || (current.id === "extra" && field.collapsed);
+        return (
+          <section key={`${field.name}:${voiceFill[field.name] ?? ""}`} className={on ? "" : "hidden"}>
             <CaptureInput
-              key={`${field.name}:${voiceFill[field.name] ?? ""}`}
               field={field}
               runtime={runtime}
               rainHintMm={rainHintMm}
@@ -200,61 +235,81 @@ export function CaptureSheet({
               plantStands={plantStands}
               initialValue={voiceFill[field.name] ?? (field.name === "plantStandId" ? plantStandId : undefined)}
             />
-          ))}
-        </div>
+          </section>
+        );
+      })}
+
+      {current.id === "extra" && extraFields.length ? (
+        <p className="text-sm text-ink-soft">Pond, pump, tank, and canal — skip if you only walked the rain gauge.</p>
       ) : null}
 
-      {collapsedCount ? (
-        <button
-          type="button"
-          onClick={() => setShowCollapsed((open) => !open)}
-          className="tap text-sm font-semibold text-leaf-deep"
-        >
-          {showCollapsed ? "Hide extra water" : "More water"}
-        </button>
-      ) : null}
-
-      <label className="block">
-        <span className={labelClass}>Note</span>
-        <textarea
-          name="note"
-          rows={3}
-          placeholder="What did you see?"
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          className={`${fieldClass} py-3`}
+      <section className={current.id === "note" || current.id === "review" ? "space-y-3" : "hidden"}>
+        <label className="block">
+          <span className={labelClass}>Note</span>
+          <textarea
+            name="note"
+            rows={3}
+            placeholder="What did you see?"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            className={`${fieldClass} py-3`}
+          />
+        </label>
+        <VoiceNote
+          onTranscript={(text, lang) => {
+            setNote((prev) => [prev, text].filter(Boolean).join(" ").trim());
+            setVoiceLang(lang);
+            if (!visionEnabled) return;
+            const fd = new FormData();
+            fd.set("transcript", text);
+            fd.set("domain", domain);
+            start(async () => {
+              const result = await suggestVoiceLogAction(fd);
+              if (!result.ok) return;
+              if (result.fill.note) setNote(result.fill.note);
+              if (Object.keys(result.fill.fields).length) setVoiceFill(result.fill.fields);
+            });
+          }}
         />
-      </label>
-      <VoiceNote
-        onTranscript={(text, lang) => {
-          setNote((prev) => [prev, text].filter(Boolean).join(" ").trim());
-          setVoiceLang(lang);
-          if (!visionEnabled) return;
-          const fd = new FormData();
-          fd.set("transcript", text);
-          fd.set("domain", domain);
-          start(async () => {
-            const result = await suggestVoiceLogAction(fd);
-            if (!result.ok) return;
-            if (result.fill.note) setNote(result.fill.note);
-            if (Object.keys(result.fill.fields).length) setVoiceFill(result.fill.fields);
-          });
-        }}
-      />
-      {Object.keys(voiceFill).length ? (
-        <p className="text-sm text-ink-soft">Heard the chips below — change anything that is wrong, then save.</p>
+      </section>
+
+      {current.id === "review" ? (
+        <p className="rounded-[1.25rem] bg-cream px-4 py-3 text-sm leading-relaxed">
+          Check the note{preview ? ", photo" : ""} and chips, then save to the log.
+          {Object.keys(voiceFill).length ? " Voice filled some chips — change anything that is wrong." : ""}
+        </p>
       ) : null}
 
       {message ? <p className="text-sm font-semibold text-clay">{message}</p> : null}
 
       <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-paper px-4 py-3">
-        <button
-          type="submit"
-          disabled={pending}
-          className="tap w-full rounded-full bg-leaf-deep text-base font-semibold text-cream shadow-lg disabled:opacity-60"
-        >
-          {pending ? "Saving…" : "Save to the log"}
-        </button>
+        <div className="flex gap-2">
+          {step > 0 ? (
+            <button
+              type="button"
+              className="tap flex-1 rounded-full border border-line font-semibold"
+              onClick={() => {
+                setMessage(null);
+                setStep((value) => Math.max(0, value - 1));
+              }}
+            >
+              Back
+            </button>
+          ) : null}
+          {current.optional && !last ? (
+            <button type="button" className="tap flex-1 rounded-full border border-line font-semibold" onClick={goNext}>
+              Skip
+            </button>
+          ) : null}
+          <button
+            type={last ? "submit" : "button"}
+            disabled={pending}
+            onClick={last ? undefined : goNext}
+            className="tap flex-[2] rounded-full bg-leaf-deep text-base font-semibold text-cream shadow-lg disabled:opacity-60"
+          >
+            {pending ? "Saving…" : last ? "Save to the log" : "Next"}
+          </button>
+        </div>
       </div>
     </form>
   );
@@ -276,33 +331,28 @@ function CaptureInput({
   initialValue?: string;
 }) {
   const resolved = resolveFieldOptions(field, runtime as RuntimeFarm, { animals, plantStands });
-  const span = field.colSpan === 2 ? "col-span-2" : "";
 
   if (field.type === "chips") {
     return (
-      <div className={span}>
-        <ChipField
-          name={field.name}
-          label={field.label}
-          options={resolved.options}
-          values={resolved.values}
-          initial={initialValue}
-        />
-      </div>
+      <ChipField
+        name={field.name}
+        label={field.label}
+        options={resolved.options}
+        values={resolved.values}
+        initial={initialValue}
+      />
     );
   }
   if (field.type === "select") {
     if (!resolved.options.length) return null;
     return (
-      <div className={span}>
-        <Select
-          name={field.name}
-          label={field.label}
-          options={resolved.options}
-          values={resolved.values}
-          initial={initialValue}
-        />
-      </div>
+      <Select
+        name={field.name}
+        label={field.label}
+        options={resolved.options}
+        values={resolved.values}
+        initial={initialValue}
+      />
     );
   }
   const defaultValue =
@@ -311,7 +361,7 @@ function CaptureInput({
       ? undefined
       : field.defaultValue ?? (field.name === "animalKind" ? runtime.defaultAnimalKind : undefined));
   return (
-    <label className={`block ${span}`}>
+    <label className="block">
       <span className={labelClass}>{field.label}</span>
       <input
         name={field.name}
@@ -349,7 +399,7 @@ function ChipField({
     <div>
       <p className={labelClass}>{label}</p>
       <input type="hidden" name={name} value={value} />
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {options.map((option, i) => {
           const next = values?.[i] ?? option;
           return (
@@ -357,7 +407,7 @@ function ChipField({
               key={`${name}-${next || "empty"}-${i}`}
               type="button"
               data-on={value === next ? "true" : "false"}
-              className="admin-chip"
+              className="admin-chip justify-center text-center"
               onClick={() => setValue(next)}
             >
               {option}
@@ -395,4 +445,3 @@ function Select({
     </label>
   );
 }
-

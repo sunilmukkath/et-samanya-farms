@@ -3,6 +3,11 @@ import path from "node:path";
 import type {
   AlertRow,
   AnimalRow,
+  BookAccountRow,
+  BookLineRow,
+  BookPartyRow,
+  BookSettingsRow,
+  BookVoucherRow,
   BriefRow,
   DeviceRow,
   FarmProfileRow,
@@ -18,6 +23,7 @@ import type {
   TreeRow,
   ZoneRow,
 } from "@/db/schema";
+import { chartOfAccounts, newSecretToken } from "@/lib/accounts";
 import type { FarmProfile } from "@/lib/packs/types";
 import { samanyaProfile } from "@/lib/profiles/samanya";
 
@@ -37,12 +43,40 @@ type FarmFile = {
   readings: ReadingRow[];
   alerts: AlertRow[];
   firmware: FirmwareRow[];
+  bookAccounts: BookAccountRow[];
+  bookParties: BookPartyRow[];
+  bookVouchers: BookVoucherRow[];
+  bookLines: BookLineRow[];
+  bookSettings: BookSettingsRow | null;
 };
 
 const filePath = path.join(process.cwd(), ".data", "farm.json");
 
 let cache: FarmFile | null = null;
 let chain: Promise<unknown> = Promise.resolve();
+
+function seedAccounts(now: Date): BookAccountRow[] {
+  return chartOfAccounts.map((row) => ({
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    tamil: row.tamil,
+    type: row.type,
+    groupName: row.group,
+    createdAt: now,
+  }));
+}
+
+function seedBookSettings(now: Date): BookSettingsRow {
+  return {
+    id: "farm",
+    gstin: null,
+    pan: null,
+    smsToken: newSecretToken(),
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 function asDate(value: Date | string | null | undefined) {
   if (!value) return null;
@@ -52,6 +86,7 @@ function asDate(value: Date | string | null | undefined) {
 
 function revive(data: Partial<FarmFile>): FarmFile {
   const base = seed();
+  const now = new Date();
   return {
     species: (data.species ?? base.species).map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
     zones: (data.zones ?? base.zones).map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
@@ -122,6 +157,23 @@ function revive(data: Partial<FarmFile>): FarmFile {
       ...row,
       createdAt: new Date(row.createdAt),
     })),
+    bookAccounts: data.bookAccounts?.length
+      ? data.bookAccounts.map((row) => ({ ...row, createdAt: new Date(row.createdAt) }))
+      : seedAccounts(now),
+    bookParties: (data.bookParties ?? []).map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
+    bookVouchers: (data.bookVouchers ?? []).map((row) => ({
+      ...row,
+      occurredAt: new Date(row.occurredAt),
+      createdAt: new Date(row.createdAt),
+    })),
+    bookLines: (data.bookLines ?? []).map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
+    bookSettings: data.bookSettings
+      ? {
+          ...data.bookSettings,
+          createdAt: new Date(data.bookSettings.createdAt),
+          updatedAt: new Date(data.bookSettings.updatedAt),
+        }
+      : seedBookSettings(now),
   };
 }
 
@@ -168,6 +220,11 @@ function seed(): FarmFile {
     readings: [],
     alerts: [],
     firmware: [],
+    bookAccounts: seedAccounts(now),
+    bookParties: [],
+    bookVouchers: [],
+    bookLines: [],
+    bookSettings: seedBookSettings(now),
   };
 }
 
@@ -175,7 +232,11 @@ async function read(): Promise<FarmFile> {
   if (cache) return cache;
   try {
     const raw = await readFile(filePath, "utf8");
-    cache = revive(JSON.parse(raw) as Partial<FarmFile>);
+    const parsed = JSON.parse(raw) as Partial<FarmFile>;
+    cache = revive(parsed);
+    if (!parsed.bookAccounts?.length || !parsed.bookSettings) {
+      await persist(cache);
+    }
     return cache;
   } catch {
     cache = seed();
@@ -524,6 +585,83 @@ export const fileStore = {
     return mutate((data) => {
       data.firmware.unshift(row);
       return row;
+    });
+  },
+  async listBookAccounts() {
+    const data = await read();
+    return [...data.bookAccounts].sort((a, b) => a.code.localeCompare(b.code));
+  },
+  async getBookSettings() {
+    const data = await read();
+    return data.bookSettings;
+  },
+  saveBookSettings(patch: Partial<BookSettingsRow>) {
+    return mutate((data) => {
+      const now = new Date();
+      data.bookSettings = {
+        ...(data.bookSettings ?? seedBookSettings(now)),
+        ...patch,
+        updatedAt: now,
+      };
+      return data.bookSettings;
+    });
+  },
+  async listParties() {
+    const data = await read();
+    return [...data.bookParties].sort((a, b) => a.name.localeCompare(b.name));
+  },
+  upsertParty(row: BookPartyRow) {
+    return mutate((data) => {
+      const existing = data.bookParties.find((item) => item.name.toLowerCase() === row.name.toLowerCase());
+      if (existing) {
+        Object.assign(existing, {
+          gstin: row.gstin ?? existing.gstin,
+          phone: row.phone ?? existing.phone,
+          upi: row.upi ?? existing.upi,
+        });
+        return existing;
+      }
+      data.bookParties.unshift(row);
+      return row;
+    });
+  },
+  insertVoucher(voucher: BookVoucherRow, lines: BookLineRow[]) {
+    return mutate((data) => {
+      data.bookVouchers.unshift(voucher);
+      data.bookLines.unshift(...lines);
+      return voucher;
+    });
+  },
+  async getVoucher(id: string) {
+    const data = await read();
+    return data.bookVouchers.find((row) => row.id === id) ?? null;
+  },
+  async getVoucherBySmsHash(hash: string) {
+    const data = await read();
+    return data.bookVouchers.find((row) => row.smsHash === hash) ?? null;
+  },
+  async listVouchers(opts: { fy?: string; kind?: string; limit?: number }) {
+    const data = await read();
+    let rows = data.bookVouchers;
+    if (opts.fy) rows = rows.filter((row) => row.fy === opts.fy);
+    if (opts.kind) rows = rows.filter((row) => row.kind === opts.kind);
+    return [...rows]
+      .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+      .slice(0, opts.limit ?? 80);
+  },
+  async listLines(opts: { voucherId?: string; accountId?: string; limit?: number }) {
+    const data = await read();
+    let rows = data.bookLines;
+    if (opts.voucherId) rows = rows.filter((row) => row.voucherId === opts.voucherId);
+    if (opts.accountId) rows = rows.filter((row) => row.accountId === opts.accountId);
+    return [...rows]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, opts.limit ?? 200);
+  },
+  deleteVoucher(id: string) {
+    return mutate((data) => {
+      data.bookVouchers = data.bookVouchers.filter((row) => row.id !== id);
+      data.bookLines = data.bookLines.filter((row) => row.voucherId !== id);
     });
   },
 };

@@ -127,6 +127,7 @@ button,
 
 .admin-app {
   overscroll-behavior: none;
+  overflow-x: hidden;
 }
 
 .admin-app input,
@@ -136,7 +137,10 @@ button,
 }
 
 .admin-chip {
+  display: inline-flex;
   min-height: 44px;
+  max-width: 100%;
+  align-items: center;
   border-radius: 999px;
   border: 1px solid var(--line);
   padding: 0 14px;
@@ -168,7 +172,7 @@ button,
 .admin-camera {
   position: relative;
   display: flex;
-  min-height: 8.5rem;
+  min-height: 7.5rem;
   width: 100%;
   cursor: pointer;
   align-items: center;
@@ -181,7 +185,7 @@ button,
 
 @media (min-height: 740px) {
   .admin-camera {
-    min-height: 11rem;
+    min-height: 9.5rem;
   }
 }
 

@@ -71,35 +71,40 @@ export function FarmSetupWizard({ profile }: { profile: FarmProfile }) {
             Village
             <input name="village" defaultValue={profile.location.village} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
           </label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block text-sm font-semibold">
-              Timezone
-              <input name="timezone" defaultValue={profile.timezone} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
-            </label>
-            <label className="block text-sm font-semibold">
-              Currency
-              <input name="currency" defaultValue={profile.currency} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
-            </label>
-          </div>
-          <label className="block text-sm font-semibold">
-            Units
-            <select name="units" defaultValue={profile.units} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal">
-              <option value="metric">Metric</option>
-              <option value="imperial">Imperial</option>
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">
-            Languages (comma)
-            <input name="languages" defaultValue={profile.languages.join(", ")} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
-          </label>
           <label className="block text-sm font-semibold">
             Acres
             <input name="acres" defaultValue={profile.acres ?? ""} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
           </label>
-          <label className="tap flex items-center gap-3 text-sm">
-            <input type="checkbox" name="publicSite" value="1" defaultChecked={profile.publicSite} className="h-4 w-4" />
-            Keep the public marketing site
-          </label>
+          <details className="rounded-2xl bg-cream px-3 py-2">
+            <summary className="cursor-pointer text-sm font-semibold">Timezone, currency, languages</summary>
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="block text-sm font-semibold">
+                  Timezone
+                  <input name="timezone" defaultValue={profile.timezone} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Currency
+                  <input name="currency" defaultValue={profile.currency} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
+                </label>
+              </div>
+              <label className="block text-sm font-semibold">
+                Units
+                <select name="units" defaultValue={profile.units} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal">
+                  <option value="metric">Metric</option>
+                  <option value="imperial">Imperial</option>
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">
+                Languages (comma)
+                <input name="languages" defaultValue={profile.languages.join(", ")} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
+              </label>
+              <label className="tap flex items-center gap-3 text-sm">
+                <input type="checkbox" name="publicSite" value="1" defaultChecked={profile.publicSite} className="h-4 w-4" />
+                Keep the public marketing site
+              </label>
+            </div>
+          </details>
         </div>
 
         <div className={step === 1 ? "space-y-4" : "hidden"}>
@@ -141,7 +146,7 @@ export function FarmSetupWizard({ profile }: { profile: FarmProfile }) {
 
         <div className={step === 2 ? "space-y-4" : "hidden"}>
           <p className="text-sm text-ink-soft">Drop a pin. Walk the boundary later on the map.</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="block text-sm font-semibold">
               Lat
               <input name="lat" defaultValue={profile.location.lat} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
@@ -170,7 +175,7 @@ export function FarmSetupWizard({ profile }: { profile: FarmProfile }) {
             Tree census target (blank to hide)
             <input name="treeCensusTarget" defaultValue={profile.treeCensusTarget ?? ""} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="block text-sm font-semibold">
               Animal target
               <input name="animalCensusTarget" defaultValue={profile.animalCensusTarget ?? ""} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
