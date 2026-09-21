@@ -22,9 +22,11 @@ export async function requireAdmin() {
   return session;
 }
 
-export async function requireOperator() {
+export async function requireOperator(denied?: "books") {
   const session = await requireAdmin();
-  if (farmRole(session.user?.email) !== "operator") redirect("/admin");
+  if (farmRole(session.user?.email) !== "operator") {
+    redirect(denied === "books" ? "/admin/more?denied=books" : "/admin");
+  }
   return session;
 }
 

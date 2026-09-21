@@ -2,6 +2,7 @@ import { acknowledgeAlertAction, commandDeviceAction } from "@/app/admin/actions
 import Link from "next/link";
 import { DeviceCreateForm } from "@/components/admin/DeviceCreateForm";
 import { listAlerts, listDevices, listPlots, latestReadings, listReadings } from "@/db/queries";
+import { currentRole } from "@/lib/admin";
 import { timeAgo } from "@/lib/farm";
 import { otaCommand } from "@/lib/iot/ota";
 
@@ -11,6 +12,8 @@ export default async function NodesPage({
   searchParams: Promise<{ device?: string }>;
 }) {
   const params = await searchParams;
+  const role = await currentRole();
+  const operator = role === "operator";
   const [devices, readings, alerts, plots] = await Promise.all([
     listDevices(),
     latestReadings(),
@@ -20,6 +23,7 @@ export default async function NodesPage({
   const selected = devices.find((device) => device.id === params.device) ?? devices[0] ?? null;
   const history = selected ? await listReadings({ deviceId: selected.id, limit: 40 }) : [];
   const ota = selected ? await otaCommand(selected.id) : null;
+  const canCommand = selected && operator && (selected.kind === "pump" || selected.kind === "valve");
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5">
@@ -67,7 +71,7 @@ export default async function NodesPage({
             const latest = readings.find((row) => row.deviceId === device.id);
             return (
               <li key={device.id}>
-                <a href={`/admin/nodes?device=${device.id}`} className="block rounded-3xl border border-line bg-white px-4 py-4">
+                <a href={`/admin/nodes?device=${device.id}`} className="tap block rounded-3xl border border-line bg-white px-4 py-4">
                   <p className="font-display text-2xl">{device.name}</p>
                   <p className="text-sm text-ink-soft">
                     {device.kind} · {device.protocol} · {device.status}
@@ -87,7 +91,7 @@ export default async function NodesPage({
           <p className="text-sm text-ink-soft">
             Battery {selected.batteryV ?? "—"} V · RSSI {selected.rssi ?? "—"} · firmware {selected.firmware ?? "—"}
           </p>
-          {selected.kind === "pump" || selected.kind === "valve" ? (
+          {canCommand ? (
             <form action={commandDeviceAction} className="mt-3 flex gap-2">
               <input type="hidden" name="id" value={selected.id} />
               <button name="command" value="on" className="tap rounded-full bg-leaf-deep px-4 text-sm font-semibold text-cream">
@@ -97,6 +101,8 @@ export default async function NodesPage({
                 Off
               </button>
             </form>
+          ) : selected.kind === "pump" || selected.kind === "valve" ? (
+            <p className="mt-3 text-sm text-ink-soft">Ask an operator for pump commands.</p>
           ) : null}
           <details className="mt-3 rounded-2xl bg-cream/60 px-3 py-2">
             <summary className="tap cursor-pointer text-sm font-semibold">Advanced</summary>

@@ -10,13 +10,21 @@ import { useRef, useState, useTransition } from "react";
 
 const steps = ["Name", "Packs", "Map", "First node"] as const;
 
-export function FarmSetupWizard({ profile }: { profile: FarmProfile }) {
+export function FarmSetupWizard({ profile, canSave = true }: { profile: FarmProfile; canSave?: boolean }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(0);
   const [pending, start] = useTransition();
   const [token, setToken] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  if (!canSave) {
+    return (
+      <p className="rounded-[1.25rem] bg-cream px-4 py-3 text-sm">
+        Ask an operator for farm setup. You can still log notes and walk the map.
+      </p>
+    );
+  }
 
   return (
     <div>

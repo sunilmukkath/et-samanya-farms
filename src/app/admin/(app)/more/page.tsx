@@ -1,68 +1,66 @@
+import { MoreDirectory, type MoreGroup } from "@/components/admin/MoreDirectory";
 import { currentRole } from "@/lib/admin";
 import type { AdminModule } from "@/lib/packs/types";
 import { getRuntimeFarm } from "@/lib/profile";
-import Link from "next/link";
 
-type MoreLink = { href: string; label: string; hint: string; module: AdminModule | null };
+type CatalogLink = {
+  href: string;
+  label: string;
+  hint: string;
+  module: AdminModule | null;
+  find?: string;
+};
 
-const thisFarm: MoreLink[] = [
-  { href: "/admin/tasks", label: "Work list", hint: "What needs a walk", module: "tasks" as const },
-  { href: "/admin/brief", label: "Weekly brief", hint: "What to check this week", module: "brief" as const },
-  { href: "/admin/search", label: "Ask the notes", hint: "Talk or type — answers from your notes", module: null },
-  { href: "/admin/season", label: "Season", hint: "Rain, harvest, planting windows", module: "season" as const },
-  { href: "/admin/plots", label: "Plots", hint: "Named beds on the map", module: "plots" as const },
-  { href: "/admin/stands", label: "Beds", hint: "Crop cycles on horticulture rows", module: "stands" as const },
-  { href: "/admin/animals", label: "Animals", hint: "Herd as entities", module: "animals" as const },
-  { href: "/admin/stay", label: "Stay", hint: "Occupancy history", module: "stay" as const },
+const today: CatalogLink[] = [
+  { href: "/admin/tasks", label: "Work list", hint: "What needs a walk", module: "tasks", find: "task jobs" },
+  { href: "/admin/brief", label: "Weekly brief", hint: "What to check this week", module: "brief", find: "tony print" },
+  { href: "/admin/search", label: "Ask the notes", hint: "Talk or type — answers from your notes", module: null, find: "ask search voice" },
+  { href: "/admin/season", label: "Season", hint: "Rain, harvest, planting windows", module: "season", find: "rain weather year" },
 ];
 
-const setup: MoreLink[] = [
-  { href: "/admin/nodes", label: "Nodes", hint: "Pair sensors and watch live values", module: "nodes" as const },
-  { href: "/admin/hardware", label: "4-acre kit", hint: "Phones first, then pond, soil, pump, rain", module: null },
-  { href: "/admin/books", label: "Books", hint: "GST, bills, bank SMS — Indian FY", module: "ledger" as const },
-  { href: "/admin/setup", label: "Farm setup", hint: "Name, packs, map pin, first node", module: null },
+const land: CatalogLink[] = [
+  { href: "/admin/map", label: "Map", hint: "Trees, beds, and nodes on this land", module: "map", find: "gps walk outline" },
+  { href: "/admin/plots", label: "Plots", hint: "Named beds on the map", module: "plots" },
+  { href: "/admin/stands", label: "Beds", hint: "Crop cycles on horticulture rows", module: "stands", find: "plants horticulture" },
+  { href: "/admin/animals", label: "Animals", hint: "Herd as entities", module: "animals", find: "cattle feed" },
+  { href: "/admin/stay", label: "Stay", hint: "Occupancy history", module: "stay", find: "guests farm stay" },
 ];
 
-export default async function AdminMorePage() {
+const books: CatalogLink[] = [
+  { href: "/admin/books", label: "Day book", hint: "Cash, bank, UPI — this Indian FY", module: "ledger", find: "gst gstin pan money ledger finance books" },
+  { href: "/admin/books/new", label: "New bill", hint: "Photo, SMS, or type a voucher", module: "ledger", find: "gst invoice receipt bill" },
+  { href: "/admin/books/reports", label: "Reports", hint: "P&L and GST for the CA", module: "ledger", find: "gst itr profit loss" },
+];
+
+const setup: CatalogLink[] = [
+  { href: "/admin/nodes", label: "Nodes", hint: "Pair sensors and watch live values", module: "nodes", find: "pump mqtt sensor" },
+  { href: "/admin/hardware", label: "4-acre kit", hint: "Phones first, then pond, soil, pump, rain", module: null, find: "lora kit" },
+  { href: "/admin/setup", label: "Farm setup", hint: "Name, packs, map pin, first node", module: null, find: "onboard packs" },
+];
+
+export default async function AdminMorePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const params = await searchParams;
   const role = await currentRole();
   const runtime = await getRuntimeFarm();
 
-  function shown(links: MoreLink[]) {
+  function shown(links: CatalogLink[]) {
     return links.filter((link) => {
-      if ((link.href === "/admin/ledger" || link.href === "/admin/books") && role === "staff") return false;
+      if (link.module === "ledger" && role === "staff") return false;
       if (link.module && !runtime.modules.includes(link.module)) return false;
       return true;
     });
   }
 
-  return (
-    <div className="mx-auto max-w-xl px-4 py-5">
-      <h1 className="font-display text-3xl sm:text-4xl">{runtime.name}</h1>
-      <p className="mt-2 text-sm text-ink-soft">This farm and the setup behind it.</p>
+  const groups: MoreGroup[] = [
+    { id: "today", title: "Today", links: shown(today) },
+    { id: "land", title: "On the land", links: shown(land) },
+    { id: "books", title: "Books", links: shown(books) },
+    { id: "setup", title: "Setup", links: shown(setup) },
+  ].filter((group) => group.links.length);
 
-      <h2 className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-muted">This farm</h2>
-      <ul className="mt-2 space-y-2.5">
-        {shown(thisFarm).map((link) => (
-          <li key={link.href}>
-            <Link href={link.href} className="tap flex min-h-16 flex-col justify-center rounded-3xl border border-line bg-white px-5 py-3">
-              <p className="font-display text-xl leading-tight sm:text-2xl">{link.label}</p>
-              <p className="text-sm text-ink-soft">{link.hint}</p>
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      <h2 className="mt-8 text-xs font-semibold uppercase tracking-[0.16em] text-muted">Setup</h2>
-      <ul className="mt-2 space-y-2.5 pb-4">
-        {shown(setup).map((link) => (
-          <li key={link.href}>
-            <Link href={link.href} className="tap flex min-h-16 flex-col justify-center rounded-3xl border border-line bg-white px-5 py-3">
-              <p className="font-display text-xl leading-tight sm:text-2xl">{link.label}</p>
-              <p className="text-sm text-ink-soft">{link.hint}</p>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  return <MoreDirectory farmName={runtime.name} groups={groups} denied={params.denied} />;
 }

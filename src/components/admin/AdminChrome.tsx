@@ -34,7 +34,7 @@ export function AdminHeader({
           </p>
         </Link>
         <form action={signOut}>
-          <button type="submit" className="tap min-w-12 px-2 text-xs font-semibold text-cream">
+          <button type="submit" className="tap min-w-12 rounded-full px-3 text-sm font-semibold text-cream">
             Sign out
           </button>
         </form>
@@ -56,7 +56,7 @@ export function AdminTabBar({ tabs }: { tabs: AdminTab[] }) {
               key={tab.href}
               href={tab.href}
               data-on={on ? "true" : "false"}
-              className="admin-tab tap flex-col gap-0.5 px-1 py-1.5 text-[11px] font-semibold leading-none"
+              className="admin-tab tap flex-col gap-0.5 px-1 py-1.5 text-xs font-semibold leading-none"
             >
               <TabGlyph name={tab.icon} />
               {tab.label}

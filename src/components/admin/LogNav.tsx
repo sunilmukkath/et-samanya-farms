@@ -9,10 +9,11 @@ import {
 } from "@/lib/packs/groups";
 import type { DomainDef } from "@/lib/packs/types";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const LAST_DOMAIN = "farm-log-last-domain";
 const LAST_GROUP = "farm-log-last-group";
+const LOG_HINT = "farm-log-chip-hint-dismissed";
 
 export function LogNav({
   currentDomain,
@@ -31,6 +32,11 @@ export function LogNav({
   const groups = groupsFor(domains);
   const active = groups.find((group) => group.id === currentGroup);
   const showSubs = currentGroup === "crop" || currentGroup === "more";
+  const [showHint, setShowHint] = useState(true);
+
+  useEffect(() => {
+    if (localStorage.getItem(LOG_HINT) === "1") setShowHint(false);
+  }, []);
 
   useEffect(() => {
     if (!hasDomainParam) {
@@ -111,6 +117,21 @@ export function LogNav({
           Past
         </a>
       </div>
+      {showHint ? (
+        <p className="mt-3 flex items-start justify-between gap-3 rounded-[1.25rem] bg-cream px-4 py-3 text-sm text-ink">
+          <span>Note = photo or voice. Water = rain gauge. Crop = beds and pick.</span>
+          <button
+            type="button"
+            className="tap shrink-0 px-2 text-sm font-semibold text-leaf-deep"
+            onClick={() => {
+              localStorage.setItem(LOG_HINT, "1");
+              setShowHint(false);
+            }}
+          >
+            Got it
+          </button>
+        </p>
+      ) : null}
     </div>
   );
 }
