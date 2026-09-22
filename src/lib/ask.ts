@@ -1,5 +1,6 @@
 import { listObservations } from "@/db/queries";
 import type { ObservationRow } from "@/db/schema";
+import type { FieldGuide } from "@/lib/guide";
 import { domainCatalogBySlug } from "@/lib/packs/domains";
 import { getFarmProfile } from "@/lib/profile";
 import { geminiGenerateJson, geminiGenerateText } from "@/lib/vision";
@@ -127,4 +128,37 @@ Rules:
 
   const answer = model?.trim() || `${hits.length} matching note${hits.length === 1 ? "" : "s"} in the log.`;
   return { question, answer, terms, rows: hits };
+}
+
+export async function askGuide(questionRaw: string, guide: FieldGuide): Promise<{ question: string; answer: string }> {
+  const question = cleanTerm(questionRaw).slice(0, 240);
+  if (!question) return { question: "", answer: "" };
+  const fallback = localGuideAnswer(question, guide);
+  const model = await geminiGenerateText(
+    `You advise a farmer in India. Answer in the same language as the question (Tamil, Hindi, or English).
+Scale: ${guide.scale === "home" ? "home garden, pots, balcony, kitchen beds" : "a working farm"}.
+Use only this brief. If the brief does not cover the question, say what to check on the land.
+Do not invent millimetres, rupees, kilograms, or pesticide brand names.
+3 to 6 short sentences.
+Brief:
+${guide.brief}
+Question: ${question}`,
+  );
+  return { question, answer: model?.trim() || fallback };
+}
+
+function localGuideAnswer(question: string, guide: FieldGuide) {
+  const q = question.toLowerCase();
+  if (/(water|irrig|தண்ணீர்|paani|pani|पानी)/i.test(q)) {
+    return guide.water.map((call) => `${call.title}. ${call.detail}`).join(" ");
+  }
+  if (/(price|market|rate|mandi|விலை|भाव|bhav)/i.test(q)) return guide.marketLine;
+  if (/(yield|harvest|crop|அறுவடை)/i.test(q)) return guide.outlook.map((row) => row.line).join(" ");
+  if (/(disease|pest|leaf|நோய்|कीट|keeda)/i.test(q)) {
+    const issue = guide.issues[0];
+    return issue
+      ? `${issue.crop}: ${issue.issue}${issue.step ? `. ${issue.step}` : ""}`
+      : "Take a daylight photo of one sick leaf in See the leaf.";
+  }
+  return guide.advisories.slice(0, 3).join(" ") || guide.satelliteLine;
 }

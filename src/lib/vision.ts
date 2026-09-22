@@ -1,4 +1,4 @@
-import type { AiSuggestion, ObservationDomain, TreeHabit, TreeHealth } from "@/db/schema";
+import { aiCauses, type AiCause, type AiSuggestion, type ObservationDomain, type TreeHabit, type TreeHealth } from "@/db/schema";
 import { domainCatalogBySlug } from "@/lib/packs/domains";
 import { fileToBase64 } from "@/lib/photos";
 import { getFarmProfile } from "@/lib/profile";
@@ -23,8 +23,10 @@ async function packPrompt(pack: VisionPack) {
   const farm = await farmLine();
   if (pack === "plant_health") {
     return `You help ${farm} read plant health from a phone photo.
-Identify crop or tree if possible, likely pest/disease/stress (issue), health, and a cultural control (no pesticide push unless the photo clearly shows sprayed residue).
-Return ONLY JSON with keys: species, tamil, habit, health, confidence, rationale, issue, culturalControl.
+Identify crop, pot herb, or tree if possible. Name the likely pest, disease, nutrient gap, or water stress.
+Return ONLY JSON with keys: species, tamil, habit, health, confidence, rationale, issue, cause, culturalControl.
+cause must be one of: pest, disease, nutrient, water, unknown.
+culturalControl is one safe next step for a field bed or a home pot: hand pick, neem, drainage, compost, shade, or ease watering. Do not name a pesticide brand.
 habit one of: sapling, young, mature (or null).
 health one of: healthy, watch, stressed, dead.
 confidence 0-1.`;
@@ -121,6 +123,7 @@ export async function suggestFromImage(
       confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0)),
       rationale: String(parsed.rationale || ""),
       issue: parsed.issue ? String(parsed.issue) : null,
+      cause: aiCauses.includes(parsed.cause as AiCause) ? (parsed.cause as AiCause) : null,
       culturalControl: parsed.culturalControl ? String(parsed.culturalControl) : null,
       compostMaturity: parsed.compostMaturity ? String(parsed.compostMaturity) : null,
       cattleCondition: parsed.cattleCondition ? String(parsed.cattleCondition) : null,

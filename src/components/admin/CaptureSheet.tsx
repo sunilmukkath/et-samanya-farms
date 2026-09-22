@@ -167,6 +167,7 @@ export function CaptureSheet({
       {ai ? (
         <p className="rounded-[1.25rem] bg-cream px-4 py-3 text-sm leading-relaxed">
           AI suggests <strong>{ai.species}</strong>
+          {ai.cause && ai.cause !== "unknown" ? ` · ${ai.cause}` : ""}
           {ai.issue ? ` · ${ai.issue}` : ""}
           {ai.culturalControl ? `. Try: ${ai.culturalControl}` : ""}
           {ai.compostMaturity ? ` · heap ${ai.compostMaturity}` : ""}

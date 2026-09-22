@@ -12,6 +12,7 @@ type CatalogLink = {
 };
 
 const today: CatalogLink[] = [
+  { href: "/admin/guide", label: "Field guide", hint: "Photo, zones, rain advice, voice, and water", module: null, find: "plantix disease ndvi yield weather voice irrigation garden diagnose" },
   { href: "/admin/tasks", label: "Work list", hint: "What needs a walk", module: "tasks", find: "task jobs" },
   { href: "/admin/brief", label: "Weekly brief", hint: "What to check this week", module: "brief", find: "tony print" },
   { href: "/admin/search", label: "Ask the notes", hint: "Talk or type — answers from your notes", module: null, find: "ask search voice" },

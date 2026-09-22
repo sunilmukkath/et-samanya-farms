@@ -38,7 +38,8 @@ import type {
   TreeHealth,
 } from "@/db/schema";
 import { farmRole, requireAdmin, requireOperator } from "@/lib/admin";
-import { askFarm } from "@/lib/ask";
+import { askFarm, askGuide } from "@/lib/ask";
+import { loadFieldGuide, type GuideScale } from "@/lib/guide";
 import { generateFarmBrief } from "@/lib/brief";
 import { detailsFromFields, resolveFieldOptions } from "@/lib/capture";
 import { applyPhi } from "@/lib/phi";
@@ -326,6 +327,12 @@ export async function suggestTreeVisionAction(formData: FormData) {
 export async function askFarmAction(question: string) {
   await requireAdmin();
   return askFarm(question);
+}
+
+export async function askGuideAction(question: string, scale: GuideScale) {
+  await requireAdmin();
+  const guide = await loadFieldGuide(scale === "home" ? "home" : "farm", { satellite: false });
+  return askGuide(question, guide);
 }
 
 export async function suggestVoiceLogAction(formData: FormData) {

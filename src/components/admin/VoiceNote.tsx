@@ -1,14 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+const voiceLangs = [
+  { lang: "ta-IN", label: "தமிழ் voice" },
+  { lang: "hi-IN", label: "हिन्दी voice" },
+  { lang: "en-IN", label: "English voice" },
+];
 
 export function VoiceNote({
   onTranscript,
+  langs = ["ta-IN", "en-IN"],
 }: {
   onTranscript: (text: string, lang: string) => void;
+  langs?: string[];
 }) {
   const [listening, setListening] = useState<string | null>(null);
-  const supported = typeof window !== "undefined" && "webkitSpeechRecognition" in window;
+  const [supported, setSupported] = useState(true);
+
+  useEffect(() => {
+    setSupported("webkitSpeechRecognition" in window);
+  }, []);
 
   if (!supported) {
     return <p className="text-xs text-muted">Voice needs Chrome or Safari on this phone.</p>;
@@ -29,24 +41,21 @@ export function VoiceNote({
     rec.start();
   }
 
+  const buttons = voiceLangs.filter((item) => langs.includes(item.lang));
+
   return (
     <div className="flex flex-wrap gap-2">
-      <button
-        type="button"
-        className="admin-chip"
-        data-on={listening === "ta-IN" ? "true" : "false"}
-        onClick={() => listen("ta-IN")}
-      >
-        {listening === "ta-IN" ? "Listening…" : "தமிழ் voice"}
-      </button>
-      <button
-        type="button"
-        className="admin-chip"
-        data-on={listening === "en-IN" ? "true" : "false"}
-        onClick={() => listen("en-IN")}
-      >
-        {listening === "en-IN" ? "Listening…" : "English voice"}
-      </button>
+      {buttons.map((item) => (
+        <button
+          key={item.lang}
+          type="button"
+          className="admin-chip"
+          data-on={listening === item.lang ? "true" : "false"}
+          onClick={() => listen(item.lang)}
+        >
+          {listening === item.lang ? "Listening…" : item.label}
+        </button>
+      ))}
     </div>
   );
 }

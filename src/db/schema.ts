@@ -61,6 +61,9 @@ export type GeoPolygon = {
   coordinates: number[][][];
 };
 
+export const aiCauses = ["pest", "disease", "nutrient", "water", "unknown"] as const;
+export type AiCause = (typeof aiCauses)[number];
+
 export type AiSuggestion = {
   species: string;
   tamil: string | null;
@@ -69,6 +72,7 @@ export type AiSuggestion = {
   confidence: number;
   rationale: string;
   issue?: string | null;
+  cause?: AiCause | null;
   culturalControl?: string | null;
   compostMaturity?: string | null;
   cattleCondition?: string | null;
