@@ -11,12 +11,16 @@ type CatalogLink = {
   find?: string;
 };
 
-const today: CatalogLink[] = [
+const guide: CatalogLink[] = [
   { href: "/admin/guide", label: "Field guide", hint: "Photo, zones, rain advice, voice, and water", module: null, find: "plantix disease ndvi yield weather voice irrigation garden diagnose" },
-  { href: "/admin/tasks", label: "Work list", hint: "What needs a walk", module: "tasks", find: "task jobs" },
-  { href: "/admin/brief", label: "Weekly brief", hint: "What to check this week", module: "brief", find: "tony print" },
+  { href: "/admin/weather", label: "Weather trends", hint: "Week, month, and year on this pin", module: null, find: "rain yoy month week climate weather" },
   { href: "/admin/search", label: "Ask the notes", hint: "Talk or type — answers from your notes", module: null, find: "ask search voice" },
   { href: "/admin/season", label: "Season", hint: "Rain, harvest, planting windows", module: "season", find: "rain weather year" },
+];
+
+const work: CatalogLink[] = [
+  { href: "/admin/tasks", label: "Work list", hint: "What needs a walk", module: "tasks", find: "task jobs" },
+  { href: "/admin/brief", label: "Weekly brief", hint: "What to check this week", module: "brief", find: "tony print" },
 ];
 
 const land: CatalogLink[] = [
@@ -57,10 +61,11 @@ export default async function AdminMorePage({
   }
 
   const groups: MoreGroup[] = [
-    { id: "today", title: "Today", links: shown(today) },
-    { id: "land", title: "On the land", links: shown(land) },
-    { id: "books", title: "Books", links: shown(books) },
-    { id: "setup", title: "Setup", links: shown(setup) },
+    { id: "guide", title: "Guide", blurb: "A sick leaf, the rain record, and questions from the notes.", links: shown(guide) },
+    { id: "work", title: "Work", blurb: "What to walk, and the note for the week.", links: shown(work) },
+    { id: "land", title: "Land", blurb: "Map, beds, animals, and stay.", links: shown(land) },
+    { id: "books", title: "Books", blurb: "Bills, the day book, and GST.", links: shown(books) },
+    { id: "setup", title: "Setup", blurb: "Sensors, the kit list, and the farm pin.", links: shown(setup) },
   ].filter((group) => group.links.length);
 
   return <MoreDirectory farmName={runtime.name} groups={groups} denied={params.denied} />;

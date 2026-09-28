@@ -20,8 +20,6 @@ import {
   zoneLabels,
 } from "@/lib/farm";
 import { haversineMeters, nearestPoints } from "@/lib/geo";
-import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
-import type { GeoJSONSource, MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -104,9 +102,10 @@ export function FarmMap({
 }) {
   const router = useRouter();
   const container = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<MapLibreMap | null>(null);
-  const youRef = useRef<Marker | null>(null);
-  const draftRef = useRef<Marker | null>(null);
+  const mapRef = useRef<any>(null);
+  const libRef = useRef<any>(null);
+  const youRef = useRef<any>(null);
+  const draftRef = useRef<any>(null);
   const { fix, error } = useGps();
   const [healthFilter, setHealthFilter] = useState<TreeHealth | "all">("all");
   const [speciesFilter, setSpeciesFilter] = useState("all");
@@ -124,6 +123,7 @@ export function FarmMap({
   const [showDrone, setShowDrone] = useState(Boolean(droneTileUrl));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [mapProblem, setMapProblem] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const droneTiles = droneTileUrl;
 
@@ -141,9 +141,21 @@ export function FarmMap({
   const watchCount = trees.filter((tree) => tree.health === "watch" || tree.health === "stressed").length;
 
   useEffect(() => {
-    if (!container.current || mapRef.current) return;
-    const map = new MapLibreMap({
-      container: container.current,
+    const el = container.current;
+    if (!el || mapRef.current) return;
+    let cancelled = false;
+    let map: any = null;
+    let observer: ResizeObserver | null = null;
+
+    (async () => {
+      // Served from /public so the bundler does not wrap the map worker.
+      // @ts-expect-error public map bundle is not a TypeScript module
+      const lib: any = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "/maplibre/maplibre-gl.mjs");
+      if (cancelled) return;
+      lib.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+      libRef.current = lib;
+      map = new lib.Map({
+      container: el,
       style: {
         version: 8,
         glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
@@ -154,6 +166,7 @@ export function FarmMap({
               "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
             ],
             tileSize: 256,
+            maxzoom: 19,
             attribution: "Tiles © Esri",
           },
         },
@@ -163,18 +176,31 @@ export function FarmMap({
         Number.isFinite(farmCenter.lng) ? farmCenter.lng : farmCoords.lng,
         Number.isFinite(farmCenter.lat) ? farmCenter.lat : farmCoords.lat,
       ],
-      zoom: 17.2,
-      maxZoom: 20,
+      zoom: 16,
+      maxZoom: 19,
     });
-    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    el.style.position = "absolute";
+    el.style.inset = "0";
+    el.style.width = "100%";
+    el.style.height = "100%";
+    map.addControl(new lib.NavigationControl({ showCompass: false }), "top-right");
+    const resize = () => map.resize();
+    observer = new ResizeObserver(resize);
+    observer.observe(el);
+    map.on("error", (event: { error?: { message?: string } }) => {
+      const message = event.error?.message ?? "";
+      if (/worker|WebGL|style/i.test(message)) setMapProblem(message);
+    });
     map.on("load", () => {
+      resize();
+      requestAnimationFrame(() => resize());
       setMapReady(true);
       map.addSource("trees", {
         type: "geojson",
         data: emptyFc(),
         cluster: true,
         clusterRadius: 34,
-        clusterMaxZoom: 19,
+        clusterMaxZoom: 16,
       });
       map.addLayer({
         id: "clusters",
@@ -275,16 +301,16 @@ export function FarmMap({
         );
       }
     });
-    map.on("click", "tree-dots", (event: MapLayerMouseEvent) => {
+    map.on("click", "tree-dots", (event: { features?: { properties?: { id?: string } }[] }) => {
       const id = event.features?.[0]?.properties?.id as string | undefined;
       if (id) setSelectedId(id);
     });
-    map.on("click", "clusters", (event: MapLayerMouseEvent) => {
+    map.on("click", "clusters", (event: { features?: { properties?: { cluster_id?: number }; geometry: unknown }[] }) => {
       const feature = event.features?.[0];
-      const source = map.getSource("trees") as GeoJSONSource;
+      const source = map.getSource("trees");
       const clusterId = feature?.properties?.cluster_id as number | undefined;
       if (clusterId == null || !feature) return;
-      source.getClusterExpansionZoom(clusterId).then((zoom) => {
+      source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
         const geometry = feature.geometry as unknown as { coordinates: [number, number] };
         map.easeTo({ center: geometry.coordinates, zoom });
       });
@@ -296,8 +322,14 @@ export function FarmMap({
       map.getCanvas().style.cursor = "";
     });
     mapRef.current = map;
+    })().catch((err: unknown) => {
+      if (!cancelled) setMapProblem(err instanceof Error ? err.message : "The map script did not load.");
+    });
+
     return () => {
-      map.remove();
+      cancelled = true;
+      observer?.disconnect();
+      map?.remove();
       mapRef.current = null;
     };
     // Created once on mount; drone tiles are read at boot.
@@ -307,7 +339,7 @@ export function FarmMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!mapReady || !map?.getSource("trees")) return;
-    const source = map.getSource("trees") as GeoJSONSource;
+    const source = map.getSource("trees");
     source.setData({
       type: "FeatureCollection",
       features: filtered
@@ -324,7 +356,7 @@ export function FarmMap({
     const map = mapRef.current;
     if (!mapReady || !map?.getSource("boundary")) return;
     const saved = zones.find((zone) => zone.name === "Farm boundary" && zone.polygon);
-    const source = map.getSource("boundary") as GeoJSONSource;
+    const source = map.getSource("boundary");
     if (boundaryPts.length >= 2) {
       const ring = [...boundaryPts, boundaryPts[0]];
       source.setData({
@@ -352,7 +384,7 @@ export function FarmMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!mapReady || !map?.getSource("plots")) return;
-    const source = map.getSource("plots") as GeoJSONSource;
+    const source = map.getSource("plots");
     if (!showPlots) {
       source.setData(emptyFc());
       return;
@@ -388,7 +420,7 @@ export function FarmMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!mapReady || !map?.getSource("health")) return;
-    const source = map.getSource("health") as GeoJSONSource;
+    const source = map.getSource("health");
     if (!showHealth) {
       source.setData(emptyFc());
       return;
@@ -411,11 +443,11 @@ export function FarmMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!mapReady || !map || !fix) return;
+    if (!mapReady || !map || !fix || !libRef.current) return;
     if (!youRef.current) {
       const el = document.createElement("div");
       el.className = "h-3.5 w-3.5 rounded-full border-2 border-white bg-sky-400 shadow";
-      youRef.current = new Marker({ element: el }).setLngLat([fix.lng, fix.lat]).addTo(map);
+      youRef.current = new libRef.current.Marker({ element: el }).setLngLat([fix.lng, fix.lat]).addTo(map);
     } else {
       youRef.current.setLngLat([fix.lng, fix.lat]);
     }
@@ -423,8 +455,8 @@ export function FarmMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!mapReady || !map?.isStyleLoaded()) return;
-    const markers: Marker[] = [];
+    if (!mapReady || !map?.isStyleLoaded() || !libRef.current) return;
+    const markers: { remove: () => void }[] = [];
     for (const device of devices) {
       if (device.lat == null || device.lng == null) continue;
       const el = document.createElement("div");
@@ -433,7 +465,7 @@ export function FarmMap({
         device.status === "online"
           ? "h-3 w-3 rounded-full border-2 border-white bg-sun shadow"
           : "h-3 w-3 rounded-full border-2 border-white bg-muted shadow";
-      markers.push(new Marker({ element: el }).setLngLat([device.lng, device.lat]).addTo(map));
+      markers.push(new libRef.current.Marker({ element: el }).setLngLat([device.lng, device.lat]).addTo(map));
     }
     return () => {
       for (const marker of markers) marker.remove();
@@ -442,14 +474,14 @@ export function FarmMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !libRef.current) return;
     if (!adding || !draft) {
       draftRef.current?.remove();
       draftRef.current = null;
       return;
     }
     if (!draftRef.current) {
-      const marker = new Marker({ color: "#c45c32", draggable: true })
+      const marker = new libRef.current.Marker({ color: "#c45c32", draggable: true })
         .setLngLat([draft.lng, draft.lat])
         .addTo(map);
       marker.on("dragend", () => {
@@ -521,8 +553,13 @@ export function FarmMap({
   const walkingPlot = plots.find((plot) => plot.id === plotWalkId);
 
   return (
-    <div className="relative h-full min-h-0 flex-1 overflow-hidden bg-soil">
-      <div ref={container} className="absolute inset-0" />
+    <div className="absolute inset-0 overflow-hidden bg-soil">
+      <div ref={container} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+      {mapProblem ? (
+        <p className="absolute inset-x-3 bottom-24 z-10 rounded-2xl bg-clay-deep px-4 py-3 text-sm text-cream">
+          The map could not start. {mapProblem}
+        </p>
+      ) : null}
 
       <div className="absolute inset-x-0 top-0 z-10 p-3">
         <div className="rounded-[1.25rem] bg-paper/95 px-3 py-2 shadow">

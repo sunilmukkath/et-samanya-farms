@@ -57,6 +57,9 @@ export default async function AdminHomePage() {
             </span>
           </div>
           {weather?.week.length ? <WeatherStrip days={weather.week} todayDate={weather.todayDate} /> : null}
+          <Link href="/admin/weather" className="mt-4 inline-block text-sm font-semibold text-sun">
+            Week, month, and year
+          </Link>
         </section>
 
         <OnFarmWater water={water} />

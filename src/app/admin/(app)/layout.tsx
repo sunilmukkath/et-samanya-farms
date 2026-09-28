@@ -33,7 +33,7 @@ export default async function AdminAppLayout({ children }: { children: React.Rea
         signOut={signOutAction}
       />
       <PwaRegister />
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-paper text-ink">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-paper text-ink">
         {children}
       </div>
       <AdminTabBar tabs={tabsFor()} />

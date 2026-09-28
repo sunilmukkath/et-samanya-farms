@@ -1,7 +1,7 @@
+const CACHE = "samanya-farm-v3";
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open("samanya-farm-v2").then((cache) => cache.addAll(["/admin", "/admin-manifest.webmanifest"])),
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(["/admin", "/admin-manifest.webmanifest"])));
   self.skipWaiting();
 });
 
@@ -9,24 +9,16 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== "samanya-farm-v2").map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  if (request.method !== "GET") return;
+  if (request.method !== "GET" || request.mode !== "navigate") return;
   const url = new URL(request.url);
-  if (!url.pathname.startsWith("/admin") && url.origin === self.location.origin) return;
+  if (url.origin !== self.location.origin || !url.pathname.startsWith("/admin")) return;
 
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open("samanya-farm-v2").then((cache) => cache.put(request, copy));
-        return response;
-      })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/admin"))),
-  );
+  event.respondWith(fetch(request).catch(() => caches.match("/admin")));
 });
