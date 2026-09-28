@@ -1,5 +1,7 @@
 import { FarmMapLoader } from "@/components/admin/FarmMapLoader";
 import { latestReadings, listDevices, listObservations, listPlots, listSpecies, listTrees, listZones } from "@/db/queries";
+import { censusTotals, sectionCensus } from "@/lib/census";
+import { loadFieldStart } from "@/lib/field-start";
 import { droneTileUrl, isVisionConfigured } from "@/lib/farm";
 import { getRuntimeFarm } from "@/lib/profile";
 
@@ -14,11 +16,11 @@ async function settled<T>(promise: Promise<T>, fallback: T) {
 export default async function AdminMapPage({
   searchParams,
 }: {
-  searchParams: Promise<{ walkPlot?: string }>;
+  searchParams: Promise<{ walkPlot?: string; walk?: string; count?: string }>;
 }) {
   const runtime = await getRuntimeFarm();
-  const { walkPlot } = await searchParams;
-  const [trees, species, zones, plots, healthRows, devices, readings] = await Promise.all([
+  const { walkPlot, walk, count } = await searchParams;
+  const [trees, species, zones, plots, healthRows, devices, readings, censusRows] = await Promise.all([
     settled(listTrees(), []),
     settled(listSpecies(), []),
     settled(listZones(), []),
@@ -26,7 +28,11 @@ export default async function AdminMapPage({
     settled(listObservations({ domain: "plant_health", limit: 80 }), []),
     settled(listDevices(), []),
     settled(latestReadings(), []),
+    settled(listObservations({ domain: "trees", limit: 120 }), []),
   ]);
+  const sections = sectionCensus(censusRows);
+  const totals = censusTotals(sections);
+  const start = await loadFieldStart();
 
   return (
     <div className="absolute inset-0 min-h-0">
@@ -67,6 +73,14 @@ export default async function AdminMapPage({
       censusTarget={runtime.treeCensusTarget ?? 0}
       zoneChoices={runtime.zoneLabels}
       walkPlotId={walkPlot || null}
+      walkFence={walk === "fence"}
+      countSection={count === "1" || start.step === "count"}
+      countOnly={start.step === "count"}
+      photoCensus={
+        sections.length
+          ? { trees: totals.trees, plants: totals.plants, sections: sections.length }
+          : null
+      }
       devices={devices
         .filter((device) => device.lat != null && device.lng != null)
         .map((device) => {

@@ -45,6 +45,7 @@ import { detailsFromFields, resolveFieldOptions } from "@/lib/capture";
 import { applyPhi } from "@/lib/phi";
 import { parseSpokenLog } from "@/lib/voice-log";
 import { isObservationDomain, plotKindOptions } from "@/lib/farm";
+import { polygonAcres } from "@/lib/geo";
 import { hashDeviceToken, mintDeviceToken } from "@/lib/iot/tokens";
 import { actuationAllowed, recordActuation } from "@/lib/iot/ota";
 import { isPackId } from "@/lib/packs/resolve";
@@ -367,8 +368,100 @@ export async function saveBoundaryAction(points: { lat: number; lng: number }[])
     coordinates: [ring.map((point) => [point.lng, point.lat])],
   };
   await saveFarmBoundary(polygon);
+  const acres = polygonAcres(ring);
+  if (acres > 0) {
+    const profile = await getFarmProfile();
+    await saveFarmProfileRecord({ ...profile, acres });
+    clearFarmProfileCache();
+  }
   revalidateAdmin();
-  return { ok: true as const };
+  return { ok: true as const, acres };
+}
+
+export async function suggestSectionCountAction(formData: FormData) {
+  await requireAdmin();
+  const file = photoFile(formData);
+  if (!file) return { ok: false as const, error: "Take a photo of this section first." };
+  const { countSectionFromImage } = await import("@/lib/section-count");
+  const guess = await countSectionFromImage(file);
+  if (!guess) return { ok: false as const, error: "Vision is off or could not count this photo." };
+  return { ok: true as const, guess };
+}
+
+export async function saveSectionCountAction(formData: FormData) {
+  const session = await requireAdmin();
+  if (!canPersistFarmData()) {
+    return { ok: false as const, error: "Add Railway DATABASE_URL to save the census." };
+  }
+  const trees = num(formData, "trees");
+  const plants = num(formData, "plants");
+  if (trees == null && plants == null) {
+    return { ok: false as const, error: "Enter how many trees and plants you see." };
+  }
+  let plotId = str(formData, "plotId") || null;
+  let section = str(formData, "section");
+  if (!plotId && section) {
+    const plot = await insertPlot({
+      name: section,
+      kind: "trees",
+      polygon: null,
+      note: "Named while counting a section from a photo.",
+    });
+    plotId = plot.id;
+  }
+  if (!section && plotId) section = "Section";
+  if (!section) return { ok: false as const, error: "Name this belt, bed, or yard." };
+
+  let photoUrl: string | null = null;
+  try {
+    const file = photoFile(formData);
+    photoUrl = file ? await uploadPhoto(file) : null;
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Photo upload failed." };
+  }
+
+  const treeCount = Math.max(0, Math.round(trees ?? 0));
+  const plantCount = Math.max(0, Math.round(plants ?? 0));
+  const weather = weatherSnapshot(await getFarmWeather());
+  await insertObservation({
+    domain: "trees",
+    occurredAt: new Date(),
+    note: str(formData, "note") || `${section}: ${treeCount} trees, ${plantCount} plants`,
+    photoUrl,
+    lat: num(formData, "lat"),
+    lng: num(formData, "lng"),
+    accuracyM: num(formData, "accuracyM"),
+    weather,
+    details: {
+      action: "section-count",
+      section,
+      treeCount,
+      plantCount,
+      crop: str(formData, "species") || undefined,
+    },
+    treeId: null,
+    plotId,
+    animalId: null,
+    source: farmRole(session.user?.email) === "staff" ? "staff" : "operator",
+    createdBy: session.user?.email ?? null,
+  });
+  revalidateAdmin();
+  return { ok: true as const, plotId, trees: treeCount, plants: plantCount };
+}
+
+export async function finishTreeCountAction() {
+  await requireAdmin();
+  const rows = await listObservations({ domain: "trees", limit: 200 });
+  const counted = rows.some((row) => row.details?.action === "section-count");
+  if (!counted) return;
+  const profile = await getFarmProfile();
+  if (!profile.censusDoneAt) {
+    await saveFarmProfileRecord({ ...profile, censusDoneAt: new Date().toISOString() });
+    clearFarmProfileCache();
+  }
+  revalidateAdmin();
+  const { redirect } = await import("next/navigation");
+  redirect("/admin");
 }
 
 export async function getTreeDetailAction(id: string) {

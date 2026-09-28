@@ -8,7 +8,7 @@ import { gallery, harvest } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Harvest",
   description:
-    "Vegetables, spinach, sesame, urad dal, and fruit from a five-acre agroforestry farm.",
+    "Vegetables, spinach, sesame, urad dal, and fruit from an agroforestry farm.",
 };
 
 export default async function HarvestPage() {
@@ -27,7 +27,7 @@ export default async function HarvestPage() {
             Fresh food from the same plot as the trees.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">
-            Horticulture and solo crops among 1,600 trees. ET Samanya is how
+            Horticulture and solo crops among the trees. ET Samanya is how
             that food reaches people. Ask for this week&apos;s list — the beds
             change with the season.
           </p>

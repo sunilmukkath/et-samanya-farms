@@ -1,4 +1,8 @@
-const farmOperators = ["sunilmukkath@elastictree.com", "tony@elastictree.com"];
+const farmOperators = [
+  "sunilmukkath@elastictree.com",
+  "tony@elastictree.com",
+  "palani@elastictree.com",
+];
 
 function splitEmails(value: string | undefined) {
   return (value ?? "")

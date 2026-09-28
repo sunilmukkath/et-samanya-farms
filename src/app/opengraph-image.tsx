@@ -43,7 +43,7 @@ export default async function OpenGraphImage() {
             ))}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", marginTop: 16, fontSize: 36, color: "#3d4434" }}>
-            {"Everyday food, grown among 1,600 trees.".split(" ").map((word, index) => (
+            {"Everyday food, grown on this plot.".split(" ").map((word, index) => (
               <span key={`${word}-${index}`} style={{ marginRight: 12 }}>
                 {word}
               </span>

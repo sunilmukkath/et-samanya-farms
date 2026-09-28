@@ -32,8 +32,13 @@ export async function getFarmProfile(): Promise<FarmProfile> {
   } catch {
     stored = null;
   }
-  const value = normalizeProfile(stored ?? seedFarmProfile());
+  const normalized = normalizeProfile(stored ?? seedFarmProfile());
+  const { profile: value, changed } = dropBrochureCounts(normalized);
   cache = { at: Date.now(), value };
+  if (stored && changed) {
+    const queries = await import("@/db/queries");
+    await queries.saveFarmProfileRecord(value);
+  }
   return value;
 }
 
@@ -44,7 +49,23 @@ function normalizeProfile(value: FarmProfile): FarmProfile {
     animalCensusTarget: value.animalCensusTarget ?? null,
     bedCensusTarget: value.bedCensusTarget ?? null,
     treeCensusTarget: value.treeCensusTarget ?? null,
+    censusDoneAt: value.censusDoneAt ?? null,
   };
+}
+
+/** The old brochure pair. A walked fence writes its own acres. */
+function dropBrochureCounts(value: FarmProfile): { profile: FarmProfile; changed: boolean } {
+  let profile = value;
+  let changed = false;
+  if (profile.treeCensusTarget === 1600) {
+    profile = { ...profile, treeCensusTarget: null };
+    changed = true;
+  }
+  if (value.acres === 5 && value.treeCensusTarget === 1600) {
+    profile = { ...profile, acres: null };
+    changed = true;
+  }
+  return { profile, changed };
 }
 
 export async function getRuntimeFarm(): Promise<RuntimeFarm> {

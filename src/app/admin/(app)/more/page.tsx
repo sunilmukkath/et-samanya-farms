@@ -24,7 +24,9 @@ const work: CatalogLink[] = [
 ];
 
 const land: CatalogLink[] = [
-  { href: "/admin/map", label: "Map", hint: "Trees, beds, and nodes on this land", module: "map", find: "gps walk outline" },
+  { href: "/admin/map?walk=fence", label: "Walk the fence", hint: "GPS the outer perimeter. Acres come from that walk.", module: "map", find: "gps boundary acres fence tony" },
+  { href: "/admin/map?count=1", label: "Count a section", hint: "Photograph a belt or bed. Confirm trees and plants.", module: "map", find: "census photo trees plants" },
+  { href: "/admin/map", label: "Map", hint: "Trees, beds, and the fence on this land", module: "map", find: "gps walk outline" },
   { href: "/admin/plots", label: "Plots", hint: "Named beds on the map", module: "plots" },
   { href: "/admin/stands", label: "Beds", hint: "Crop cycles on horticulture rows", module: "stands", find: "plants horticulture" },
   { href: "/admin/animals", label: "Animals", hint: "Herd as entities", module: "animals", find: "cattle feed" },

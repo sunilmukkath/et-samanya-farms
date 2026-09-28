@@ -6,7 +6,7 @@ import { journey, landUnits, site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "The farm",
   description:
-    "Five acres of agroforestry: 1,600+ trees, a Sensei pond, solar irrigation, and ET Samanya Foods from the same land.",
+    "Agroforestry with a Sensei pond, solar irrigation, and ET Samanya Foods from the same land.",
 };
 
 export default function FarmPage() {
@@ -17,7 +17,7 @@ export default function FarmPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-clay">The farm</p>
             <h1 className="mt-3 font-display text-4xl tracking-tight sm:text-6xl">
-              Five acres, landscaped to get more out of the land.
+              Landscaped to get more out of the land.
             </h1>
           </div>
           <p className="max-w-md text-base leading-relaxed text-ink-soft">
@@ -38,15 +38,14 @@ export default function FarmPage() {
         </div>
         <div className="space-y-6 text-lg leading-relaxed text-ink-soft">
           <p>
-            We started this plot in {site.founded} on {site.acres} acres bought
-            the November before. The work is agroforestry: trees with crops, so
+            We started this plot in {site.founded}. The land was bought the
+            November before. The work is agroforestry: trees with crops, so
             the farm feeds people and still holds a canopy.
           </p>
           <p>
-            More than {site.treesPlanted.toLocaleString("en-IN")} trees are in
-            the ground — timber, medicinal, and fruit — with a vegetable patch
-            and solo crops of sesame, urad dal, and spinach. {site.legalName}{" "}
-            is how nutritional food leaves the farm.
+            Trees are in the ground — timber, medicinal, and fruit — with a
+            vegetable patch and solo crops of sesame, urad dal, and spinach.{" "}
+            {site.legalName} is how nutritional food leaves the farm.
           </p>
           <p>
             <span className="font-tamil font-semibold text-leaf">சாமான்யம்</span>{" "}

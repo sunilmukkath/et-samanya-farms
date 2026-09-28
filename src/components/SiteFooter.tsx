@@ -15,8 +15,7 @@ export async function SiteFooter() {
             <p className="font-tamil mt-2 text-sm text-sand">சாமான்ய உணவு</p>
           </div>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-sand">
-            Five acres of agroforestry. Everyday food among more than 1,600
-            trees. {site.tagline}
+            Agroforestry on this plot. Everyday food among the trees. {site.tagline}
           </p>
         </div>
 

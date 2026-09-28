@@ -102,7 +102,7 @@ export function FarmSetupWizard({ profile, canSave = true }: { profile: FarmProf
           </label>
           <label className="block text-sm font-semibold">
             Acres
-            <input name="acres" defaultValue={profile.acres ?? ""} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
+            <input name="acres" defaultValue={profile.acres ?? ""} placeholder="Leave blank until the fence is walked" className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
           </label>
           <label className="tap flex items-center gap-3 text-sm">
             <input type="checkbox" name="publicSite" value="1" defaultChecked={profile.publicSite} className="h-4 w-4" />
@@ -148,7 +148,9 @@ export function FarmSetupWizard({ profile, canSave = true }: { profile: FarmProf
         </div>
 
         <div className={step === 2 ? "space-y-4" : "hidden"}>
-          <p className="text-sm text-ink-soft">Drop a pin. Walk the boundary later on the map.</p>
+          <p className="text-sm text-ink-soft">
+            Drop a pin for the farm centre. Tony walks the outer fence later on the map — acres are measured from that GPS path, not typed here.
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-sm font-semibold">
               Lat
@@ -175,7 +177,7 @@ export function FarmSetupWizard({ profile, canSave = true }: { profile: FarmProf
             Use this phone’s GPS
           </button>
           <label className="block text-sm font-semibold">
-            Tree census target (blank to hide)
+            Tree census target (blank — count from photos instead)
             <input name="treeCensusTarget" defaultValue={profile.treeCensusTarget ?? ""} className="tap mt-1 w-full rounded-2xl border border-line px-3 font-normal" />
           </label>
           <div className="grid grid-cols-2 gap-2">

@@ -114,6 +114,9 @@ export type ObservationDetails = {
   sprayProduct?: string;
   phiDays?: number;
   safeToPickOn?: string;
+  treeCount?: number;
+  plantCount?: number;
+  section?: string;
 };
 
 export type BriefStats = {

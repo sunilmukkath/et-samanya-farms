@@ -1,6 +1,6 @@
 # ET Samanya Farms
 
-Standalone public website for **ET Samanya Farms** — a 5-acre agroforestry farm. Vegetables, sesame, urad, spinach, and fruit among 1,600+ trees. A little earth. A lot of heart.
+Standalone public website for **ET Samanya Farms** — an agroforestry farm. Vegetables, sesame, urad, spinach, and fruit among the trees. A little earth. A lot of heart.
 
 This project is not part of Elastic Tree.
 

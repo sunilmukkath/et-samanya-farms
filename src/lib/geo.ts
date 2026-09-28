@@ -33,3 +33,44 @@ export function closeRing(points: { lat: number; lng: number }[]) {
   if (first.lat === last.lat && first.lng === last.lng) return points;
   return [...points, first];
 }
+
+export function pathLengthMeters(points: { lat: number; lng: number }[]) {
+  let sum = 0;
+  for (let i = 1; i < points.length; i++) sum += haversineMeters(points[i - 1], points[i]);
+  return sum;
+}
+
+export function polygonAreaM2(points: { lat: number; lng: number }[]) {
+  if (points.length < 3) return 0;
+  const R = 6371000;
+  const ring = closeRing(points);
+  let area = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const a = ring[i];
+    const b = ring[i + 1];
+    area += toRad(b.lng - a.lng) * (2 + Math.sin(toRad(a.lat)) + Math.sin(toRad(b.lat)));
+  }
+  return Math.abs((area * R * R) / 2);
+}
+
+export function polygonAcres(points: { lat: number; lng: number }[]) {
+  const m2 = polygonAreaM2(points);
+  if (m2 <= 0) return 0;
+  return Math.round((m2 / 4046.8564224) * 100) / 100;
+}
+
+export type SurveyFix = { lat: number; lng: number; accuracy: number; at: number };
+
+export function keepFenceFix(
+  prev: SurveyFix | null,
+  next: SurveyFix,
+): "keep" | "skip-accuracy" | "skip-still" | "skip-jump" {
+  if (next.accuracy > 20) return "skip-accuracy";
+  if (!prev) return next.accuracy <= 12 ? "keep" : "skip-accuracy";
+  if (next.accuracy > 15 && next.accuracy > prev.accuracy) return "skip-accuracy";
+  const dist = haversineMeters(prev, next);
+  if (dist < 2.5) return "skip-still";
+  const dt = Math.max(0.4, (next.at - prev.at) / 1000);
+  if (dist > 22 || dist / dt > 3.5) return "skip-jump";
+  return "keep";
+}

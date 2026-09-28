@@ -17,8 +17,8 @@ export const samanyaProfile: FarmProfile = {
     address: "East Street, Thenkulapakkam, Tamil Nadu 604304",
     timezone: "Asia/Kolkata",
   },
-  acres: 5,
-  treeCensusTarget: 1600,
+  acres: null,
+  treeCensusTarget: null,
   animalCensusTarget: null,
   bedCensusTarget: null,
   enabledPacks: ["agroforestry", "horticulture", "livestock", "water", "permaculture", "stay", "energy"],
@@ -37,6 +37,7 @@ export const samanyaProfile: FarmProfile = {
   defaultAnimalKind: tamilNaduAgroforestry.defaultAnimalKind,
   rules: tamilNaduAgroforestry.rules,
   onboardedAt: "2022-01-01T00:00:00.000Z",
+  censusDoneAt: null,
 };
 
 export function blankFarmProfile(): FarmProfile {
@@ -76,5 +77,6 @@ export function blankFarmProfile(): FarmProfile {
     defaultAnimalKind: "Cattle",
     rules: [],
     onboardedAt: null,
+    censusDoneAt: null,
   };
 }

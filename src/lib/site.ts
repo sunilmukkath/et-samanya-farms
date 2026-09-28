@@ -5,13 +5,11 @@ export const site = {
   slogan: "Making farming cool again.",
   tagline: "A little earth. A lot of heart.",
   description:
-    "ET Samanya Farms grows everyday food — vegetables, sesame, urad, spinach, fruit — among more than 1,600 trees, with a pond, solar irrigation, and room for people to come back to the land.",
+    "ET Samanya Farms grows everyday food — vegetables, sesame, urad, spinach, fruit — with a pond, solar irrigation, and room for people to come back to the land.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://etsamanyafarms.com",
   email: "hello@etsamanyafarms.com",
   phoneDisplay: "+91 98408 50057",
   phoneHref: "tel:+919840850057",
-  acres: 5,
-  treesPlanted: 1600,
   founded: 2022,
   landPurchased: 2021,
   cin: "U10799TN2025PTC176110",
@@ -40,7 +38,7 @@ export const site = {
 export const aims = [
   {
     title: "Grow our own food",
-    body: "A kitchen that starts in the field — vegetables, greens, pulses, oilseed, and fruit from the same five acres.",
+    body: "A kitchen that starts in the field — vegetables, greens, pulses, oilseed, and fruit from this plot.",
   },
   {
     title: "Keep a living balance",
@@ -96,7 +94,7 @@ export const harvest = [
     tamil: "பழம்",
     name: "Fruit",
     season: "Orchard and beds",
-    note: "Watermelon, passion fruit, and fruit trees among the 1,600 — food from the canopy and from the ground.",
+    note: "Watermelon, passion fruit, and fruit trees — food from the canopy and from the ground.",
     photo: "/photos/watermelon.jpg",
     photoAlt: "A watermelon ripening in the grass",
   },
@@ -137,7 +135,7 @@ export const journey = [
   {
     year: "2021",
     title: "Land",
-    body: "Five acres bought in November. Planning started before the first fence went in.",
+    body: "The plot was bought in November. Planning started before the first fence went in.",
   },
   {
     year: "2022",
@@ -152,7 +150,7 @@ export const journey = [
   {
     year: "2024",
     title: "More trees",
-    body: "Local farmers helped plant the next wave of trees and plants. The stand is now more than 1,600.",
+    body: "Local farmers helped plant the next wave of trees and plants.",
   },
   {
     year: "2025",

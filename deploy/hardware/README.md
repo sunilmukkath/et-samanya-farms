@@ -38,7 +38,7 @@ Pair each node in Farm OS → **Nodes** (or the setup wizard). HTTP: `POST /api/
 
 ## Do not buy
 
-Resistive soil forks, one weather station per zone, satellite IoT, dendrometers on 1,600 trees, EU-only LoRaWAN gateways, or a full auto-irrigation controller that fights the solar pump.
+Resistive soil forks, one weather station per zone, satellite IoT, dendrometers on every tree, EU-only LoRaWAN gateways, or a full auto-irrigation controller that fights the solar pump.
 
 ## Recurring
 

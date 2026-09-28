@@ -129,6 +129,12 @@ button,
   overscroll-behavior: none;
 }
 
+.admin-map,
+.admin-map .maplibregl-canvas-container,
+.admin-map .maplibregl-canvas {
+  touch-action: none;
+}
+
 .admin-app input,
 .admin-app select,
 .admin-app textarea {

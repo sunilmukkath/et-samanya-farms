@@ -146,6 +146,8 @@ export type FarmProfile = {
   defaultAnimalKind: string;
   rules: FarmRule[];
   onboardedAt: string | null;
+  /** Set when the first tree-and-sapling count is marked done. */
+  censusDoneAt: string | null;
 };
 
 export type RuntimeFarm = FarmProfile & {

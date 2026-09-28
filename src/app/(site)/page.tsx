@@ -28,8 +28,7 @@ export default function HomePage() {
               <span className="block text-leaf">A lot of heart.</span>
             </h1>
             <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-soft">
-              Five acres. More than {site.treesPlanted.toLocaleString("en-IN")}{" "}
-              trees, a vegetable patch, sesame, urad, spinach — and a pond that
+              Trees, a vegetable patch, sesame, urad, spinach — and a pond that
               holds the water on this land.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -138,8 +137,7 @@ export default function HomePage() {
             <h2 className="mt-3 font-display text-4xl tracking-tight">Agroforestry. A living balance.</h2>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-cream/80">
               Trees with crops. A donut pond in the north-east. Solar drip.
-              The land is zoned so food, water, animals, and people fit on
-              the same five acres.
+              The land is zoned so food, water, animals, and people fit together.
             </p>
             <div className="mt-8 grid gap-6 sm:grid-cols-2">
               {practices.slice(0, 4).map((item) => (

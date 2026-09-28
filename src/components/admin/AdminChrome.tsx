@@ -48,7 +48,7 @@ export function AdminTabBar({ tabs }: { tabs: AdminTab[] }) {
 
   return (
     <nav className="admin-no-print z-30 shrink-0 border-t border-white/10 bg-leaf-deep pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-      <div className="mx-auto grid max-w-xl grid-cols-4 text-center">
+      <div className={`mx-auto grid max-w-xl text-center ${tabs.length > 2 ? "grid-cols-4" : "grid-cols-2"}`}>
         {tabs.map((tab) => {
           const on = tabIsOn(tab.href, path);
           return (
@@ -69,7 +69,9 @@ export function AdminTabBar({ tabs }: { tabs: AdminTab[] }) {
 }
 
 function tabIsOn(href: string, path: string) {
-  if (href === "/admin") return path === "/admin";
+  const base = href.split("?")[0];
+  if (base === "/admin") return path === "/admin";
+  if (base === "/admin/map") return path.startsWith("/admin/map");
   if (href === "/admin/log") {
     return path === "/admin/log" || path.startsWith("/admin/log/") || path.startsWith("/admin/logs");
   }

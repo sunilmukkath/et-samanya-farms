@@ -8,9 +8,10 @@ export type GpsFix = {
   accuracy: number;
 };
 
-export function useGps() {
+export function useGps(opts?: { survey?: boolean }) {
   const [fix, setFix] = useState<GpsFix | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const survey = Boolean(opts?.survey);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -27,10 +28,14 @@ export function useGps() {
         setError(null);
       },
       (err) => setError(err.message || "GPS denied"),
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 4000 },
+      {
+        enableHighAccuracy: true,
+        timeout: survey ? 25000 : 20000,
+        maximumAge: survey ? 0 : 4000,
+      },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, []);
+  }, [survey]);
 
   return { fix, error };
 }

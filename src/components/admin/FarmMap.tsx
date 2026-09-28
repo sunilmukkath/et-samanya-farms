@@ -8,6 +8,7 @@ import {
   suggestTreeVisionAction,
 } from "@/app/admin/actions";
 import { GpsBadge, useGps } from "@/components/admin/GpsBadge";
+import { SectionCountSheet } from "@/components/admin/SectionCountSheet";
 import { ShareNote } from "@/components/admin/ShareNote";
 import type { AiSuggestion, GeoPolygon, TreeHealth, ZoneRow } from "@/db/schema";
 import {
@@ -16,10 +17,9 @@ import {
   habitOptions,
   healthOptions,
   treeAgeLabel,
-  treeCensusTarget,
   zoneLabels,
 } from "@/lib/farm";
-import { haversineMeters, nearestPoints } from "@/lib/geo";
+import { haversineMeters, keepFenceFix, nearestPoints, pathLengthMeters, polygonAcres } from "@/lib/geo";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -82,10 +82,14 @@ export function FarmMap({
   droneTileUrl = null,
   visionEnabled,
   farmCenter = farmCoords,
-  censusTarget = treeCensusTarget,
+  censusTarget = 0,
   zoneChoices = zoneLabels,
   devices = [],
   walkPlotId = null,
+  walkFence = false,
+  countSection = false,
+  countOnly = false,
+  photoCensus = null,
 }: {
   trees: TreePin[];
   species: { name: string; tamil: string | null }[];
@@ -99,6 +103,10 @@ export function FarmMap({
   zoneChoices?: string[];
   devices?: DevicePin[];
   walkPlotId?: string | null;
+  walkFence?: boolean;
+  countSection?: boolean;
+  countOnly?: boolean;
+  photoCensus?: { trees: number; plants: number; sections: number } | null;
 }) {
   const router = useRouter();
   const container = useRef<HTMLDivElement>(null);
@@ -106,7 +114,12 @@ export function FarmMap({
   const libRef = useRef<any>(null);
   const youRef = useRef<any>(null);
   const draftRef = useRef<any>(null);
-  const { fix, error } = useGps();
+  const lastFence = useRef<{ lat: number; lng: number; accuracy: number; at: number } | null>(null);
+  const [boundaryOn, setBoundaryOn] = useState(walkFence);
+  const [fencePaused, setFencePaused] = useState(false);
+  const [fenceHint, setFenceHint] = useState<string | null>(null);
+  const [counting, setCounting] = useState(countSection);
+  const { fix, error } = useGps({ survey: boundaryOn });
   const [healthFilter, setHealthFilter] = useState<TreeHealth | "all">("all");
   const [speciesFilter, setSpeciesFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
@@ -114,7 +127,6 @@ export function FarmMap({
   const [draft, setDraft] = useState<{ lat: number; lng: number; accuracy: number | null } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getTreeDetailAction>>>(null);
-  const [boundaryOn, setBoundaryOn] = useState(false);
   const [boundaryPts, setBoundaryPts] = useState<{ lat: number; lng: number }[]>([]);
   const [plotWalkId, setPlotWalkId] = useState<string | null>(walkPlotId);
   const [plotWalkPts, setPlotWalkPts] = useState<{ lat: number; lng: number }[]>([]);
@@ -162,28 +174,40 @@ export function FarmMap({
         sources: {
           sat: {
             type: "raster",
-            tiles: [
-              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            ],
+            tiles: [0, 1, 2, 3].map(
+              (n) => `https://mt${n}.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}`,
+            ),
             tileSize: 256,
-            maxzoom: 19,
-            attribution: "Tiles © Esri",
+            maxzoom: 21,
+            attribution: "Imagery © Google",
           },
         },
-        layers: [{ id: "sat", type: "raster", source: "sat" }],
+        layers: [
+          {
+            id: "sat",
+            type: "raster",
+            source: "sat",
+            paint: { "raster-resampling": "linear" },
+          },
+        ],
       },
       center: [
         Number.isFinite(farmCenter.lng) ? farmCenter.lng : farmCoords.lng,
         Number.isFinite(farmCenter.lat) ? farmCenter.lat : farmCoords.lat,
       ],
-      zoom: 16,
-      maxZoom: 19,
+      zoom: 17,
+      maxZoom: 22,
+      minZoom: 14,
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
     });
     el.style.position = "absolute";
     el.style.inset = "0";
     el.style.width = "100%";
     el.style.height = "100%";
-    map.addControl(new lib.NavigationControl({ showCompass: false }), "top-right");
+    map.touchZoomRotate.disableRotation();
+    map.addControl(new lib.NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
     const resize = () => map.resize();
     observer = new ResizeObserver(resize);
     observer.observe(el);
@@ -256,7 +280,7 @@ export function FarmMap({
         id: "boundary-line",
         type: "line",
         source: "boundary",
-        paint: { "line-color": "#e8efd4", "line-width": 2, "line-dasharray": [2, 1] },
+        paint: { "line-color": "#e8efd4", "line-width": 3 },
       });
       map.addSource("plots", { type: "geojson", data: emptyFc() });
       map.addLayer({
@@ -514,6 +538,21 @@ export function FarmMap({
   }, [walkPlotId]);
 
   useEffect(() => {
+    if (!walkFence) return;
+    setBoundaryOn(true);
+    setBoundaryPts([]);
+    setFencePaused(false);
+    lastFence.current = null;
+    setAdding(false);
+    setCounting(false);
+    setFiltersOpen(false);
+  }, [walkFence]);
+
+  useEffect(() => {
+    if (countSection) setCounting(true);
+  }, [countSection]);
+
+  useEffect(() => {
     if (!fix) return;
     if (plotWalkId) {
       setPlotWalkPts((prev) => {
@@ -523,13 +562,30 @@ export function FarmMap({
       });
       return;
     }
-    if (!boundaryOn) return;
-    setBoundaryPts((prev) => {
-      const last = prev[prev.length - 1];
-      if (last && haversineMeters(last, fix) < 8) return prev;
-      return [...prev, { lat: fix.lat, lng: fix.lng }];
-    });
-  }, [boundaryOn, plotWalkId, fix]);
+    if (!boundaryOn || fencePaused) return;
+    const next = { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, at: Date.now() };
+    const verdict = keepFenceFix(lastFence.current, next);
+    if (verdict === "skip-accuracy") {
+      setFenceHint("Wait for GPS to settle (±12 m or better) before the next fence point.");
+      return;
+    }
+    if (verdict === "skip-jump") {
+      setFenceHint("GPS jumped. Stand still, then walk slowly along the fence.");
+      return;
+    }
+    if (verdict === "skip-still") return;
+    lastFence.current = next;
+    setFenceHint(null);
+    setBoundaryPts((prev) => [...prev, { lat: next.lat, lng: next.lng }]);
+  }, [boundaryOn, fencePaused, plotWalkId, fix]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!boundaryOn || !fix || !mapReady || !map) return;
+    const center = map.getCenter();
+    if (haversineMeters({ lat: center.lat, lng: center.lng }, fix) < 10) return;
+    map.easeTo({ center: [fix.lng, fix.lat], duration: 500, zoom: Math.max(map.getZoom(), 17.5) });
+  }, [boundaryOn, fix, mapReady]);
 
   function startAdd() {
     const map = mapRef.current;
@@ -551,10 +607,14 @@ export function FarmMap({
 
   const speciesNames = useMemo(() => Array.from(new Set(trees.map((t) => t.species))).sort(), [trees]);
   const walkingPlot = plots.find((plot) => plot.id === plotWalkId);
+  const fenceMeters = pathLengthMeters(boundaryPts);
+  const fenceAcres = boundaryPts.length >= 3 ? polygonAcres(boundaryPts) : 0;
+  const nearStart =
+    boundaryPts.length >= 8 && fix ? haversineMeters(boundaryPts[0], fix) < 18 : false;
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-soil">
-      <div ref={container} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+    <div className="admin-map absolute inset-0 overflow-hidden bg-soil">
+      <div ref={container} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", touchAction: "none" }} />
       {mapProblem ? (
         <p className="absolute inset-x-3 bottom-24 z-10 rounded-2xl bg-clay-deep px-4 py-3 text-sm text-cream">
           The map could not start. {mapProblem}
@@ -567,10 +627,16 @@ export function FarmMap({
             <p className="min-w-0 flex-1 text-sm font-semibold">
               {walkingPlot
                 ? `Walk ${walkingPlot.name}`
-                : censusTarget
-                  ? `${trees.length} / ${censusTarget}`
-                  : `${trees.length} trees`}
-              {!walkingPlot && watchCount ? <span className="ml-2 text-clay">{watchCount} on watch</span> : null}
+                : boundaryOn
+                  ? fencePaused
+                    ? "Fence paused"
+                    : "Walking the fence"
+                  : photoCensus && photoCensus.sections
+                    ? `${photoCensus.trees} trees · ${photoCensus.plants} plants`
+                    : `${trees.length} pinned`}
+              {!walkingPlot && !boundaryOn && watchCount ? (
+                <span className="ml-2 text-clay">{watchCount} on watch</span>
+              ) : null}
             </p>
             <span className="shrink-0 rounded-full bg-cream px-2 py-1">
               <GpsBadge fix={fix} error={error} />
@@ -584,6 +650,15 @@ export function FarmMap({
               Filters
             </button>
           </div>
+          {boundaryOn ? (
+            <p className="mt-2 text-sm text-ink-soft">
+              {boundaryPts.length} GPS points · {Math.round(fenceMeters)} m
+              {fenceAcres ? ` · about ${fenceAcres} acres` : " · keep walking the outer edge"}
+              {nearStart ? " · you are back at the start" : ""}
+              {fencePaused ? " · paused" : ""}
+            </p>
+          ) : null}
+          {boundaryOn && fenceHint ? <p className="mt-1 text-sm text-clay">{fenceHint}</p> : null}
           {filtersOpen ? (
             <div className="mt-3 max-h-[38dvh] space-y-2 overflow-y-auto border-t border-line pt-3">
               <div className="flex gap-2 overflow-x-auto pb-1">
@@ -630,16 +705,61 @@ export function FarmMap({
                 ) : null}
               </div>
               {boundaryOn ? (
-                <button
-                  type="button"
-                  className="text-sm font-semibold text-leaf-deep"
-                  onClick={() => {
-                    setBoundaryOn(false);
-                    setBoundaryPts([]);
-                  }}
-                >
-                  Cancel boundary walk
-                </button>
+                <div className="space-y-2">
+                  <p className="text-sm text-ink-soft">
+                    {boundaryPts.length} points · {Math.round(fenceMeters)} m
+                    {fenceAcres ? ` · about ${fenceAcres} acres` : ""}
+                    {nearStart ? " · back at the start — save" : ""}
+                  </p>
+                  {fenceHint ? <p className="text-sm text-clay">{fenceHint}</p> : null}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-leaf-deep"
+                      onClick={() => setFencePaused((value) => !value)}
+                    >
+                      {fencePaused ? "Resume" : "Pause"}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-leaf-deep"
+                      onClick={() => {
+                        setBoundaryPts((prev) => prev.slice(0, -1));
+                        lastFence.current = null;
+                      }}
+                    >
+                      Undo point
+                    </button>
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-leaf-deep"
+                      onClick={() => {
+                        if (!fix || fix.accuracy > 20) {
+                          setFenceHint("GPS is still too loose to drop a point.");
+                          return;
+                        }
+                        lastFence.current = { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, at: Date.now() };
+                        setBoundaryPts((prev) => [...prev, { lat: fix.lat, lng: fix.lng }]);
+                        setFenceHint(null);
+                      }}
+                    >
+                      Drop point here
+                    </button>
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-leaf-deep"
+                      onClick={() => {
+                        setBoundaryOn(false);
+                        setBoundaryPts([]);
+                        setFencePaused(false);
+                        lastFence.current = null;
+                        router.replace("/admin/map");
+                      }}
+                    >
+                      Cancel fence
+                    </button>
+                  </div>
+                </div>
               ) : plotWalkId ? (
                 <button
                   type="button"
@@ -658,11 +778,14 @@ export function FarmMap({
                   className="text-sm font-semibold text-leaf-deep"
                   onClick={() => {
                     setBoundaryPts([]);
+                    setFencePaused(false);
+                    lastFence.current = null;
                     setBoundaryOn(true);
                     setFiltersOpen(false);
+                    setAdding(false);
                   }}
                 >
-                  Walk boundary
+                  Walk the fence
                 </button>
               )}
             </div>
@@ -699,24 +822,58 @@ export function FarmMap({
                 const result = await saveBoundaryAction(boundaryPts);
                 if (result.ok) {
                   setBoundaryOn(false);
+                  setFencePaused(false);
+                  lastFence.current = null;
+                  router.replace("/admin");
                   router.refresh();
                 }
               });
             }}
             disabled={pending || boundaryPts.length < 3}
           >
-            Save boundary ({boundaryPts.length})
+            {pending ? "Saving…" : `Save fence${fenceAcres ? ` · ${fenceAcres} ac` : ""}`}
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={startAdd}
-            className="tap rounded-full bg-leaf px-6 text-base font-semibold text-leaf-deep shadow-lg"
-          >
-            Add tree
-          </button>
+          <div className="flex flex-col items-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setCounting(true);
+                setAdding(false);
+                setSelectedId(null);
+              }}
+              className="tap rounded-full bg-cream px-5 text-base font-semibold text-leaf-deep shadow-lg"
+            >
+              Count section
+            </button>
+            {countOnly ? null : (
+              <button
+                type="button"
+                onClick={startAdd}
+                className="tap rounded-full bg-leaf px-6 text-base font-semibold text-leaf-deep shadow-lg"
+              >
+                Add tree
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      {counting && !adding ? (
+        <SectionCountSheet
+          plots={plots.map((plot) => ({ id: plot.id, name: plot.name }))}
+          gps={fix}
+          onClose={() => {
+            setCounting(false);
+            router.replace("/admin/map");
+          }}
+          onSaved={() => {
+            setCounting(false);
+            router.replace("/admin/map");
+            router.refresh();
+          }}
+        />
+      ) : null}
 
       {adding && draft ? (
         <TreeCapture
