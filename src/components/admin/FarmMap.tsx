@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  clearBoundaryAction,
+  clearPlotPolygonAction,
   createTreeAction,
   getTreeDetailAction,
   saveBoundaryAction,
@@ -73,6 +75,8 @@ const HEALTH_COLOR: Record<TreeHealth, string> = {
 
 const YEARS = [2023, 2024, 2025, 2026];
 
+type WalkStatus = "idle" | "recording" | "paused" | "stopped";
+
 export function FarmMap({
   trees,
   species,
@@ -116,10 +120,9 @@ export function FarmMap({
   const draftRef = useRef<any>(null);
   const lastFence = useRef<{ lat: number; lng: number; accuracy: number; at: number } | null>(null);
   const [boundaryOn, setBoundaryOn] = useState(walkFence);
-  const [fencePaused, setFencePaused] = useState(false);
+  const [walkStatus, setWalkStatus] = useState<WalkStatus>(walkFence ? "recording" : "idle");
   const [fenceHint, setFenceHint] = useState<string | null>(null);
   const [counting, setCounting] = useState(countSection);
-  const { fix, error } = useGps({ survey: boundaryOn });
   const [healthFilter, setHealthFilter] = useState<TreeHealth | "all">("all");
   const [speciesFilter, setSpeciesFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
@@ -129,6 +132,8 @@ export function FarmMap({
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getTreeDetailAction>>>(null);
   const [boundaryPts, setBoundaryPts] = useState<{ lat: number; lng: number }[]>([]);
   const [plotWalkId, setPlotWalkId] = useState<string | null>(walkPlotId);
+  const walking = Boolean(boundaryOn || plotWalkId);
+  const { fix, error } = useGps({ survey: walking || walkFence });
   const [plotWalkPts, setPlotWalkPts] = useState<{ lat: number; lng: number }[]>([]);
   const [showPlots, setShowPlots] = useState(true);
   const [showHealth, setShowHealth] = useState(false);
@@ -532,6 +537,7 @@ export function FarmMap({
       setPlotWalkPts([]);
       setBoundaryOn(false);
       setBoundaryPts([]);
+      setWalkStatus("idle");
       setShowPlots(true);
       setFiltersOpen(false);
     }
@@ -541,7 +547,7 @@ export function FarmMap({
     if (!walkFence) return;
     setBoundaryOn(true);
     setBoundaryPts([]);
-    setFencePaused(false);
+    setWalkStatus("recording");
     lastFence.current = null;
     setAdding(false);
     setCounting(false);
@@ -553,8 +559,9 @@ export function FarmMap({
   }, [countSection]);
 
   useEffect(() => {
-    if (!fix) return;
+    if (!fix || walkStatus !== "recording") return;
     if (plotWalkId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- GPS watch
       setPlotWalkPts((prev) => {
         const last = prev[prev.length - 1];
         if (last && haversineMeters(last, fix) < 8) return prev;
@@ -562,7 +569,7 @@ export function FarmMap({
       });
       return;
     }
-    if (!boundaryOn || fencePaused) return;
+    if (!boundaryOn) return;
     const next = { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, at: Date.now() };
     const verdict = keepFenceFix(lastFence.current, next);
     if (verdict === "skip-accuracy") {
@@ -577,7 +584,7 @@ export function FarmMap({
     lastFence.current = next;
     setFenceHint(null);
     setBoundaryPts((prev) => [...prev, { lat: next.lat, lng: next.lng }]);
-  }, [boundaryOn, fencePaused, plotWalkId, fix]);
+  }, [boundaryOn, walkStatus, plotWalkId, fix]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -607,10 +614,133 @@ export function FarmMap({
 
   const speciesNames = useMemo(() => Array.from(new Set(trees.map((t) => t.species))).sort(), [trees]);
   const walkingPlot = plots.find((plot) => plot.id === plotWalkId);
-  const fenceMeters = pathLengthMeters(boundaryPts);
-  const fenceAcres = boundaryPts.length >= 3 ? polygonAcres(boundaryPts) : 0;
+  const savedFarm = zones.find((zone) => zone.name === "Farm boundary" && zone.polygon);
+  const walkPts = plotWalkId ? plotWalkPts : boundaryPts;
+  const fenceMeters = pathLengthMeters(walkPts);
+  const fenceAcres = walkPts.length >= 3 ? polygonAcres(walkPts) : 0;
   const nearStart =
-    boundaryPts.length >= 8 && fix ? haversineMeters(boundaryPts[0], fix) < 18 : false;
+    boundaryOn && boundaryPts.length >= 8 && fix ? haversineMeters(boundaryPts[0], fix) < 18 : false;
+  const savedWalkPolygon = plotWalkId ? Boolean(walkingPlot?.polygon) : Boolean(savedFarm?.polygon);
+  const canDelete = walkPts.length > 0 || savedWalkPolygon;
+  const canSave = walkStatus === "stopped" && walkPts.length >= 3;
+  const walkTitle = walkingPlot ? walkingPlot.name : "Farm boundary";
+  const walkStatusLabel =
+    walkStatus === "recording"
+      ? "Recording"
+      : walkStatus === "paused"
+        ? "Paused"
+        : walkStatus === "stopped"
+          ? "Stopped"
+          : "Ready";
+
+  function openFarmWalk() {
+    setBoundaryOn(true);
+    setBoundaryPts([]);
+    setWalkStatus("idle");
+    lastFence.current = null;
+    setFenceHint(null);
+    setFiltersOpen(false);
+    setAdding(false);
+    setCounting(false);
+    setSelectedId(null);
+  }
+
+  function closeWalk() {
+    setBoundaryOn(false);
+    setBoundaryPts([]);
+    setPlotWalkId(null);
+    setPlotWalkPts([]);
+    setWalkStatus("idle");
+    lastFence.current = null;
+    setFenceHint(null);
+    if (plotWalkId || walkFence) router.replace("/admin/map");
+  }
+
+  function startWalk() {
+    setWalkStatus("recording");
+    if (fix && boundaryOn) {
+      const next = { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, at: Date.now() };
+      const verdict = keepFenceFix(lastFence.current, next);
+      if (verdict === "keep") {
+        lastFence.current = next;
+        setBoundaryPts((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && haversineMeters(last, next) < 2.5) return prev;
+          return [...prev, { lat: next.lat, lng: next.lng }];
+        });
+        setFenceHint(null);
+      }
+    } else if (fix && plotWalkId) {
+      setPlotWalkPts((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && haversineMeters(last, fix) < 8) return prev;
+        return [...prev, { lat: fix.lat, lng: fix.lng }];
+      });
+    }
+  }
+
+  function pauseWalk() {
+    if (walkStatus !== "recording") return;
+    setWalkStatus("paused");
+  }
+
+  function stopWalk() {
+    if (walkStatus === "idle") return;
+    setWalkStatus("stopped");
+  }
+
+  function deleteWalk() {
+    if (walkPts.length > 0) {
+      if (walkPts.length >= 3 && !window.confirm("Clear this walk’s points?")) return;
+      setBoundaryPts([]);
+      setPlotWalkPts([]);
+      setWalkStatus("idle");
+      lastFence.current = null;
+      setFenceHint(null);
+      return;
+    }
+    if (boundaryOn && savedFarm?.polygon) {
+      if (!window.confirm("Delete the saved farm boundary?")) return;
+      start(async () => {
+        const result = await clearBoundaryAction();
+        if (result.ok) router.refresh();
+      });
+      return;
+    }
+    if (plotWalkId && walkingPlot?.polygon) {
+      if (!window.confirm(`Delete the saved outline for ${walkingPlot.name}?`)) return;
+      start(async () => {
+        const result = await clearPlotPolygonAction(plotWalkId);
+        if (result.ok) router.refresh();
+      });
+    }
+  }
+
+  function saveWalk() {
+    if (walkPts.length < 3) return;
+    start(async () => {
+      if (plotWalkId) {
+        const result = await savePlotPolygonAction(plotWalkId, plotWalkPts);
+        if (result && "ok" in result && result.ok) {
+          setPlotWalkId(null);
+          setPlotWalkPts([]);
+          setWalkStatus("idle");
+          router.replace("/admin/map");
+          router.refresh();
+        }
+        return;
+      }
+      const result = await saveBoundaryAction(boundaryPts);
+      if (result.ok) {
+        setBoundaryOn(false);
+        setWalkStatus("idle");
+        lastFence.current = null;
+        if (walkFence) router.replace("/admin");
+        else router.replace("/admin/map");
+        router.refresh();
+      }
+    });
+  }
 
   return (
     <div className="admin-map absolute inset-0 overflow-hidden bg-soil">
@@ -625,18 +755,12 @@ export function FarmMap({
         <div className="rounded-[1.25rem] bg-paper/95 px-3 py-2 shadow">
           <div className="flex items-center gap-2">
             <p className="min-w-0 flex-1 text-sm font-semibold">
-              {walkingPlot
-                ? `Walk ${walkingPlot.name}`
-                : boundaryOn
-                  ? fencePaused
-                    ? "Fence paused"
-                    : "Walking the fence"
-                  : photoCensus && photoCensus.sections
-                    ? `${photoCensus.trees} trees · ${photoCensus.plants} plants`
-                    : `${trees.length} pinned`}
-              {!walkingPlot && !boundaryOn && watchCount ? (
-                <span className="ml-2 text-clay">{watchCount} on watch</span>
-              ) : null}
+              {walking
+                ? `${walkTitle} · ${walkStatusLabel}`
+                : photoCensus && photoCensus.sections
+                  ? `${photoCensus.trees} trees · ${photoCensus.plants} plants`
+                  : `${trees.length} pinned`}
+              {!walking && watchCount ? <span className="ml-2 text-clay">{watchCount} on watch</span> : null}
             </p>
             <span className="shrink-0 rounded-full bg-cream px-2 py-1">
               <GpsBadge fix={fix} error={error} />
@@ -650,15 +774,14 @@ export function FarmMap({
               Filters
             </button>
           </div>
-          {boundaryOn ? (
+          {walking ? (
             <p className="mt-2 text-sm text-ink-soft">
-              {boundaryPts.length} GPS points · {Math.round(fenceMeters)} m
-              {fenceAcres ? ` · about ${fenceAcres} acres` : " · keep walking the outer edge"}
+              {walkPts.length} GPS points · {Math.round(fenceMeters)} m
+              {fenceAcres ? ` · about ${fenceAcres} acres` : walking && walkStatus === "recording" ? " · walk the outer edge" : ""}
               {nearStart ? " · you are back at the start" : ""}
-              {fencePaused ? " · paused" : ""}
             </p>
           ) : null}
-          {boundaryOn && fenceHint ? <p className="mt-1 text-sm text-clay">{fenceHint}</p> : null}
+          {walking && fenceHint ? <p className="mt-1 text-sm text-clay">{fenceHint}</p> : null}
           {filtersOpen ? (
             <div className="mt-3 max-h-[38dvh] space-y-2 overflow-y-auto border-t border-line pt-3">
               <div className="flex gap-2 overflow-x-auto pb-1">
@@ -704,87 +827,48 @@ export function FarmMap({
                   </Chip>
                 ) : null}
               </div>
-              {boundaryOn ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-ink-soft">
-                    {boundaryPts.length} points · {Math.round(fenceMeters)} m
-                    {fenceAcres ? ` · about ${fenceAcres} acres` : ""}
-                    {nearStart ? " · back at the start — save" : ""}
-                  </p>
-                  {fenceHint ? <p className="text-sm text-clay">{fenceHint}</p> : null}
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-leaf-deep"
-                      onClick={() => setFencePaused((value) => !value)}
-                    >
-                      {fencePaused ? "Resume" : "Pause"}
-                    </button>
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-leaf-deep"
-                      onClick={() => {
+              {walking ? (
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-leaf-deep"
+                    onClick={() => {
+                      if (plotWalkId) {
+                        setPlotWalkPts((prev) => prev.slice(0, -1));
+                      } else {
                         setBoundaryPts((prev) => prev.slice(0, -1));
                         lastFence.current = null;
-                      }}
-                    >
-                      Undo point
-                    </button>
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-leaf-deep"
-                      onClick={() => {
-                        if (!fix || fix.accuracy > 20) {
-                          setFenceHint("GPS is still too loose to drop a point.");
-                          return;
-                        }
-                        lastFence.current = { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, at: Date.now() };
-                        setBoundaryPts((prev) => [...prev, { lat: fix.lat, lng: fix.lng }]);
+                      }
+                    }}
+                  >
+                    Undo point
+                  </button>
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-leaf-deep"
+                    onClick={() => {
+                      if (!fix || fix.accuracy > 20) {
+                        setFenceHint("GPS is still too loose to drop a point.");
+                        return;
+                      }
+                      if (plotWalkId) {
+                        setPlotWalkPts((prev) => [...prev, { lat: fix.lat, lng: fix.lng }]);
                         setFenceHint(null);
-                      }}
-                    >
-                      Drop point here
-                    </button>
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-leaf-deep"
-                      onClick={() => {
-                        setBoundaryOn(false);
-                        setBoundaryPts([]);
-                        setFencePaused(false);
-                        lastFence.current = null;
-                        router.replace("/admin/map");
-                      }}
-                    >
-                      Cancel fence
-                    </button>
-                  </div>
+                        return;
+                      }
+                      lastFence.current = { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, at: Date.now() };
+                      setBoundaryPts((prev) => [...prev, { lat: fix.lat, lng: fix.lng }]);
+                      setFenceHint(null);
+                    }}
+                  >
+                    Drop point here
+                  </button>
+                  <button type="button" className="text-sm font-semibold text-leaf-deep" onClick={closeWalk}>
+                    Close mapping
+                  </button>
                 </div>
-              ) : plotWalkId ? (
-                <button
-                  type="button"
-                  className="text-sm font-semibold text-leaf-deep"
-                  onClick={() => {
-                    setPlotWalkId(null);
-                    setPlotWalkPts([]);
-                    router.replace("/admin/map");
-                  }}
-                >
-                  Cancel plot walk
-                </button>
               ) : (
-                <button
-                  type="button"
-                  className="text-sm font-semibold text-leaf-deep"
-                  onClick={() => {
-                    setBoundaryPts([]);
-                    setFencePaused(false);
-                    lastFence.current = null;
-                    setBoundaryOn(true);
-                    setFiltersOpen(false);
-                    setAdding(false);
-                  }}
-                >
+                <button type="button" className="text-sm font-semibold text-leaf-deep" onClick={openFarmWalk}>
                   Walk the fence
                 </button>
               )}
@@ -793,48 +877,42 @@ export function FarmMap({
         </div>
       </div>
 
-      <div className="absolute bottom-3 right-3 z-10">
-        {plotWalkId ? (
-          <button
-            type="button"
-            className="tap rounded-full bg-cream px-5 text-base font-semibold text-leaf-deep shadow-lg"
-            onClick={() => {
-              start(async () => {
-                const result = await savePlotPolygonAction(plotWalkId, plotWalkPts);
-                if (result && "ok" in result && result.ok) {
-                  setPlotWalkId(null);
-                  setPlotWalkPts([]);
-                  router.replace("/admin/map");
-                  router.refresh();
-                }
-              });
-            }}
-            disabled={pending || plotWalkPts.length < 3}
-          >
-            Save outline ({plotWalkPts.length})
-          </button>
-        ) : boundaryOn ? (
-          <button
-            type="button"
-            className="tap rounded-full bg-cream px-5 text-base font-semibold text-leaf-deep shadow-lg"
-            onClick={() => {
-              start(async () => {
-                const result = await saveBoundaryAction(boundaryPts);
-                if (result.ok) {
-                  setBoundaryOn(false);
-                  setFencePaused(false);
-                  lastFence.current = null;
-                  router.replace("/admin");
-                  router.refresh();
-                }
-              });
-            }}
-            disabled={pending || boundaryPts.length < 3}
-          >
-            {pending ? "Saving…" : `Save fence${fenceAcres ? ` · ${fenceAcres} ac` : ""}`}
-          </button>
-        ) : (
-          <div className="flex flex-col items-end gap-2">
+      {walking && !adding && !counting ? (
+        <WalkBar
+          title={walkTitle}
+          status={walkStatus}
+          points={walkPts.length}
+          meters={fenceMeters}
+          acres={fenceAcres}
+          gpsReady={Boolean(fix)}
+          gpsError={error}
+          pending={pending}
+          canDelete={canDelete}
+          canSave={canSave}
+          saveLabel={
+            plotWalkId
+              ? "Save outline"
+              : fenceAcres
+                ? `Save fence · ${fenceAcres} ac`
+                : "Save fence"
+          }
+          onStart={startWalk}
+          onPause={pauseWalk}
+          onStop={stopWalk}
+          onDelete={deleteWalk}
+          onSave={saveWalk}
+          onClose={closeWalk}
+        />
+      ) : adding || counting ? null : (
+        <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-col items-stretch gap-2 sm:items-end">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={openFarmWalk}
+              className="tap flex-1 rounded-full bg-cream px-4 text-base font-semibold text-leaf-deep shadow-lg sm:flex-none"
+            >
+              Walk boundary
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -842,22 +920,22 @@ export function FarmMap({
                 setAdding(false);
                 setSelectedId(null);
               }}
-              className="tap rounded-full bg-cream px-5 text-base font-semibold text-leaf-deep shadow-lg"
+              className="tap flex-1 rounded-full bg-cream px-4 text-base font-semibold text-leaf-deep shadow-lg sm:flex-none"
             >
               Count section
             </button>
-            {countOnly ? null : (
-              <button
-                type="button"
-                onClick={startAdd}
-                className="tap rounded-full bg-leaf px-6 text-base font-semibold text-leaf-deep shadow-lg"
-              >
-                Add tree
-              </button>
-            )}
           </div>
-        )}
-      </div>
+          {countOnly ? null : (
+            <button
+              type="button"
+              onClick={startAdd}
+              className="tap rounded-full bg-leaf px-6 text-base font-semibold text-leaf-deep shadow-lg"
+            >
+              Add tree
+            </button>
+          )}
+        </div>
+      )}
 
       {counting && !adding ? (
         <SectionCountSheet
@@ -894,7 +972,7 @@ export function FarmMap({
         />
       ) : null}
 
-      {detail?.tree && !adding ? (
+      {detail?.tree && !adding && !walking ? (
         <div className="absolute inset-x-0 bottom-0 z-20 max-h-[55%] overflow-y-auto rounded-t-[1.75rem] bg-paper p-5 shadow-2xl">
           <div className="flex gap-3">
             {detail.tree.photoUrl ? (
@@ -1149,6 +1227,134 @@ function TreeCapture({
         </button>
       </div>
     </form>
+  );
+}
+
+function WalkBar({
+  title,
+  status,
+  points,
+  meters,
+  acres,
+  gpsReady,
+  gpsError,
+  pending,
+  canDelete,
+  canSave,
+  saveLabel,
+  onStart,
+  onPause,
+  onStop,
+  onDelete,
+  onSave,
+  onClose,
+}: {
+  title: string;
+  status: WalkStatus;
+  points: number;
+  meters: number;
+  acres: number;
+  gpsReady: boolean;
+  gpsError: string | null;
+  pending: boolean;
+  canDelete: boolean;
+  canSave: boolean;
+  saveLabel: string;
+  onStart: () => void;
+  onPause: () => void;
+  onStop: () => void;
+  onDelete: () => void;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const recording = status === "recording";
+  const paused = status === "paused";
+  const stopped = status === "stopped";
+  const startLabel = recording ? "Start" : paused || stopped ? "Resume" : "Start";
+  const hint = !gpsReady
+    ? gpsError || "Waiting for GPS…"
+    : recording
+      ? "Walk the edge. GPS drops a point as you move."
+      : paused
+        ? "Paused. Trail is kept. Resume or stop."
+        : stopped
+          ? points >= 3
+            ? "Stopped. Save, resume, or delete."
+            : "Stopped. Need three points to save."
+          : "Press Start, then walk the fence line.";
+
+  return (
+    <div className="absolute inset-x-3 bottom-3 z-10 rounded-[1.5rem] bg-paper/95 p-3 shadow-2xl">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">
+            {title}
+            <span className="ml-2 text-ink-soft">
+              {recording ? (
+                <span className="text-clay">Recording</span>
+              ) : paused ? (
+                "Paused"
+              ) : stopped ? (
+                "Stopped"
+              ) : (
+                "Ready"
+              )}
+              {` · ${points} pt${points === 1 ? "" : "s"}`}
+              {meters ? ` · ${Math.round(meters)} m` : ""}
+              {acres ? ` · ${acres} ac` : ""}
+            </span>
+          </p>
+          <p className="mt-0.5 text-xs text-muted">{hint}</p>
+        </div>
+        <button type="button" className="tap shrink-0 px-2 text-sm font-semibold text-muted" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        <button
+          type="button"
+          className="tap rounded-2xl bg-leaf text-sm font-semibold text-leaf-deep disabled:opacity-40"
+          onClick={onStart}
+          disabled={recording || pending}
+        >
+          {startLabel}
+        </button>
+        <button
+          type="button"
+          className="tap rounded-2xl bg-sun/80 text-sm font-semibold text-leaf-deep disabled:opacity-40"
+          onClick={onPause}
+          disabled={!recording || pending}
+        >
+          Pause
+        </button>
+        <button
+          type="button"
+          className="tap rounded-2xl bg-leaf-deep text-sm font-semibold text-cream disabled:opacity-40"
+          onClick={onStop}
+          disabled={status === "idle" || stopped || pending}
+        >
+          Stop
+        </button>
+        <button
+          type="button"
+          className="tap rounded-2xl border border-clay text-sm font-semibold text-clay disabled:opacity-40"
+          onClick={onDelete}
+          disabled={!canDelete || pending}
+        >
+          Delete
+        </button>
+      </div>
+      {canSave ? (
+        <button
+          type="button"
+          className="tap mt-2 w-full rounded-full bg-leaf-deep text-sm font-semibold text-cream disabled:opacity-60"
+          onClick={onSave}
+          disabled={pending}
+        >
+          {pending ? "Saving…" : saveLabel}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

@@ -464,6 +464,13 @@ export async function finishTreeCountAction() {
   redirect("/admin");
 }
 
+export async function clearBoundaryAction() {
+  await requireAdmin();
+  await saveFarmBoundary(null);
+  revalidateAdmin();
+  return { ok: true as const };
+}
+
 export async function getTreeDetailAction(id: string) {
   await requireAdmin();
   const tree = await getTree(id);
@@ -530,6 +537,14 @@ export async function savePlotPolygonAction(id: string, points: { lat: number; l
   await updatePlot(id, {
     polygon: { type: "Polygon", coordinates: [ring.map((point) => [point.lng, point.lat])] },
   });
+  revalidateAdmin();
+  return { ok: true as const };
+}
+
+export async function clearPlotPolygonAction(id: string) {
+  await requireAdmin();
+  if (!id) return { ok: false as const, error: "Missing plot." };
+  await updatePlot(id, { polygon: null });
   revalidateAdmin();
   return { ok: true as const };
 }
