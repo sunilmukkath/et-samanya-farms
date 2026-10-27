@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   acknowledgeAlert,
   canPersistFarmData,
@@ -51,6 +52,7 @@ import { actuationAllowed, recordActuation } from "@/lib/iot/ota";
 import { isPackId } from "@/lib/packs/resolve";
 import type { FarmProfile, PackId } from "@/lib/packs/types";
 import { biomeById } from "@/lib/profiles/biomes";
+import { samanyaProfile } from "@/lib/profiles/samanya";
 import { clearFarmProfileCache, getFarmProfile, getRuntimeFarm } from "@/lib/profile";
 import { uploadPhoto } from "@/lib/photos";
 import { deriveFarmTasks } from "@/lib/tasks";
@@ -668,8 +670,35 @@ export async function acknowledgeAlertAction(formData: FormData) {
   revalidateAdmin();
 }
 
+export async function useSamanyaFarmAction() {
+  await requireOperator();
+  const current = await getFarmProfile();
+  const next: FarmProfile = {
+    ...samanyaProfile,
+    acres: current.acres ?? samanyaProfile.acres,
+    censusDoneAt: current.censusDoneAt,
+    treeCensusTarget: current.treeCensusTarget,
+    animalCensusTarget: current.animalCensusTarget,
+    bedCensusTarget: current.bedCensusTarget,
+    onboardedAt: new Date().toISOString(),
+  };
+  await saveFarmProfileRecord(next);
+  clearFarmProfileCache();
+  revalidateAdmin();
+  redirect("/admin");
+}
+
 export async function saveFarmSetupAction(formData: FormData) {
   await requireOperator();
+  try {
+    return await writeFarmSetup(formData);
+  } catch (error) {
+    console.error(error);
+    return { ok: false as const, error: "That did not save. Check the connection and try again." };
+  }
+}
+
+async function writeFarmSetup(formData: FormData) {
   const current = await getFarmProfile();
   const packs = formData.getAll("packs").map(String).filter(isPackId) as PackId[];
   const biome = biomeById(str(formData, "biomeId") || current.biomeId);
@@ -715,4 +744,5 @@ export async function saveFarmSetupAction(formData: FormData) {
   await saveFarmProfileRecord(next);
   clearFarmProfileCache();
   revalidateAdmin();
+  return { ok: true as const };
 }

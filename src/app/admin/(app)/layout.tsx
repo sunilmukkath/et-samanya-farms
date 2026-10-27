@@ -2,42 +2,23 @@ import { signOut } from "@/auth";
 import { AdminHeader, AdminTabBar, type AdminTab } from "@/components/admin/AdminChrome";
 import { PwaRegister } from "@/components/admin/PwaRegister";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { currentRole, requireAdmin } from "@/lib/admin";
-import { fieldStartRedirect, loadFieldStart, type FieldStartStep } from "@/lib/field-start";
 import { getRuntimeFarm } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
-function tabsFor(step: FieldStartStep): AdminTab[] {
-  if (step === "fence") {
-    return [
-      { href: "/admin", label: "Home", icon: "home" },
-      { href: "/admin/map?walk=fence", label: "Map", icon: "map" },
-    ];
-  }
-  if (step === "count") {
-    return [
-      { href: "/admin", label: "Home", icon: "home" },
-      { href: "/admin/map?count=1", label: "Map", icon: "map" },
-    ];
-  }
-  return [
-    { href: "/admin", label: "Home", icon: "home" },
-    { href: "/admin/map", label: "Map", icon: "map" },
-    { href: "/admin/log", label: "Log", icon: "log" },
-    { href: "/admin/more", label: "More", icon: "more" },
-  ];
-}
+const tabs: AdminTab[] = [
+  { href: "/admin", label: "Home", icon: "home" },
+  { href: "/admin/map", label: "Map", icon: "map" },
+  { href: "/admin/log", label: "Log", icon: "log" },
+  { href: "/admin/more", label: "More", icon: "more" },
+];
 
 export default async function AdminAppLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
   const role = await currentRole();
   const runtime = await getRuntimeFarm();
-  const start = await loadFieldStart();
   const path = (await headers()).get("x-pathname") ?? "";
-  const next = path ? fieldStartRedirect(start, path) : null;
-  if (next) redirect(next);
 
   async function signOutAction() {
     "use server";
@@ -59,7 +40,7 @@ export default async function AdminAppLayout({ children }: { children: React.Rea
       >
         {children}
       </div>
-      <AdminTabBar tabs={tabsFor(start.step)} />
+      <AdminTabBar tabs={tabs} />
     </div>
   );
 }
