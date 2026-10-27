@@ -623,7 +623,7 @@ export function FarmMap({
 
       <div className="absolute inset-x-0 top-0 z-10 p-3">
         <div className="rounded-[1.25rem] bg-paper/95 px-3 py-2 shadow">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <p className="min-w-0 flex-1 text-sm font-semibold">
               {walkingPlot
                 ? `Walk ${walkingPlot.name}`
@@ -651,12 +651,28 @@ export function FarmMap({
             </button>
           </div>
           {boundaryOn ? (
-            <p className="mt-2 text-sm text-ink-soft">
-              {boundaryPts.length} GPS points · {Math.round(fenceMeters)} m
-              {fenceAcres ? ` · about ${fenceAcres} acres` : " · keep walking the outer edge"}
-              {nearStart ? " · you are back at the start" : ""}
-              {fencePaused ? " · paused" : ""}
-            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <p className="min-w-0 flex-1 text-sm text-ink-soft">
+                {boundaryPts.length} GPS points · {Math.round(fenceMeters)} m
+                {fenceAcres ? ` · about ${fenceAcres} acres` : " · walk the outer edge, or leave and use the map"}
+                {nearStart ? " · you are back at the start" : ""}
+                {fencePaused ? " · paused" : ""}
+              </p>
+              <button
+                type="button"
+                className="admin-chip shrink-0"
+                onClick={() => {
+                  setBoundaryOn(false);
+                  setBoundaryPts([]);
+                  setFencePaused(false);
+                  lastFence.current = null;
+                  setFenceHint(null);
+                  router.replace("/admin/map");
+                }}
+              >
+                Leave
+              </button>
+            </div>
           ) : null}
           {boundaryOn && fenceHint ? <p className="mt-1 text-sm text-clay">{fenceHint}</p> : null}
           {filtersOpen ? (

@@ -40,6 +40,10 @@ export const samanyaProfile: FarmProfile = {
   censusDoneAt: null,
 };
 
+export function farmLooksUnset(profile: Pick<FarmProfile, "name" | "onboardedAt" | "location">) {
+  return !profile.onboardedAt || profile.name === "New farm" || !profile.location.village.trim();
+}
+
 export function blankFarmProfile(): FarmProfile {
   return {
     id: "farm",

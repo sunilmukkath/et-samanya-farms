@@ -42,7 +42,7 @@ const books: CatalogLink[] = [
 const setup: CatalogLink[] = [
   { href: "/admin/nodes", label: "Nodes", hint: "Pair sensors and watch live values", module: "nodes", find: "pump mqtt sensor" },
   { href: "/admin/hardware", label: "4-acre kit", hint: "Phones first, then pond, soil, pump, rain", module: null, find: "lora kit" },
-  { href: "/admin/setup", label: "Farm setup", hint: "Name, packs, map pin, first node", module: null, find: "onboard packs" },
+  { href: "/admin/setup", label: "Farm setup", hint: "Name and pin. The log works before this.", module: null, find: "onboard packs" },
 ];
 
 export default async function AdminMorePage({

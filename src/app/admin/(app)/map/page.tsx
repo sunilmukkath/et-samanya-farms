@@ -1,7 +1,6 @@
 import { FarmMapLoader } from "@/components/admin/FarmMapLoader";
 import { latestReadings, listDevices, listObservations, listPlots, listSpecies, listTrees, listZones } from "@/db/queries";
 import { censusTotals, sectionCensus } from "@/lib/census";
-import { loadFieldStart } from "@/lib/field-start";
 import { droneTileUrl, isVisionConfigured } from "@/lib/farm";
 import { getRuntimeFarm } from "@/lib/profile";
 
@@ -32,7 +31,6 @@ export default async function AdminMapPage({
   ]);
   const sections = sectionCensus(censusRows);
   const totals = censusTotals(sections);
-  const start = await loadFieldStart();
 
   return (
     <div className="absolute inset-0 min-h-0">
@@ -74,8 +72,8 @@ export default async function AdminMapPage({
       zoneChoices={runtime.zoneLabels}
       walkPlotId={walkPlot || null}
       walkFence={walk === "fence"}
-      countSection={count === "1" || start.step === "count"}
-      countOnly={start.step === "count"}
+      countSection={count === "1"}
+      countOnly={false}
       photoCensus={
         sections.length
           ? { trees: totals.trees, plants: totals.plants, sections: sections.length }
